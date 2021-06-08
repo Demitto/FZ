@@ -1,0 +1,7 @@
+T  = 360
+dt = 0.0625
+Nw = 512
+Ncut = 1
+imu_i = 1
+gps_i = 0
+pix_val = 255
