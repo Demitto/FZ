@@ -88,15 +88,15 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
         t = rtc.datetime
         print("The date is {}/{}/{}".format(t.tm_mday, t.tm_mon, t.tm_year))
         print("The time is {}:{:02}:{:02}".format(t.tm_hour, t.tm_min, t.tm_sec))
-    # RTC Time Now
-    rtc_t = rtc_now(i2c)
     # Setup SD card / sdioio or adafruit_sdcard
     SD_CS = board.D10
     spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
     cs = digitalio.DigitalInOut(SD_CS)
     sdcard = adafruit_sdcard.SDCard(spi, cs)
-    time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}".format(
-        rtc_t.tm_year, rtc_t.tm_mon, rtc_t.tm_mday, rtc_t.tm_hour, rtc_t.tm_min)
+    # RTC Time Now
+    # rtc_t = rtc_now(i2c)
+    # time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}".format(
+    #    rtc_t.tm_year, rtc_t.tm_mon, rtc_t.tm_mday, rtc_t.tm_hour, rtc_t.tm_min)
     Dir_Out = "data"
     vfs = storage.VfsFat(sdcard)
     storage.mount(vfs, "/sd")
@@ -106,16 +106,15 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
         import adafruit_bno055
         imu = adafruit_bno055.BNO055_I2C(i2c)
         while not imu.calibrated:
-            if( num.sum(imu.calibration_status[1:4]) >= 9):
+            if(num.sum(imu.calibration_status[1:4]) >= 9):
                 pixels[0] = (255, 255, 255)  # NeoPixiel Orange
-            elif( num.sum(imu.calibration_status[1:4]) >= 6):
+            elif(num.sum(imu.calibration_status[1:4]) >= 6):
                 pixels[0] = (255, 255, 0)  # NeoPixiel Orange
-            elif( num.sum(imu.calibration_status[1:4]) >= 3):
+            elif(num.sum(imu.calibration_status[1:4]) >= 3):
                 pixels[0] = (125, 0, 0)  # NeoPixiel Orange
             else :
                 pixels[0] = (255, 0, 0)  # NeoPixiel Orange
             time.sleep(1)
-
     elif imu_i == 2 :
         from adafruit_bno08x.i2c import BNO08X_I2C
         from adafruit_bno08x import (
@@ -216,7 +215,7 @@ def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gyro)
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.euler)
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gravity)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\r\n" % imu.calibration_status)
+                    out_f.write("%1d\t%1d\t%1d\t%1d\r\n" % imu.calibration_status)
                     i_l += 1
             out_f.flush()
     elif (imu_i == 2) :

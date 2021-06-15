@@ -15,8 +15,7 @@
 #       - 2 : BNO08x
 #       - 3 : LSM6DS33
 #       - 4 : ISM330DXCX
-#   - gps_i : if 1 : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
-#   - psd_i : if 1 : Spectral Analysis is conducted.
+#   - gps_i : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
 #   - pix_val : The intensity of Neopixel (0-255)
 #   ############################################################################
 """
