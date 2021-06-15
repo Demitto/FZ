@@ -6,6 +6,7 @@ There are the following three main files
   1. main.py  
   2. param.txt
   3. ./lib/fz.py
+
 The main.py is designed to overview the whole processes, while each process is written in fz.py. The runtime parameters can be specified by param.txt. Each parameter can be described in the head of main.py and at the end of this README.md.
 
 NeoPixel behavior 
@@ -13,6 +14,7 @@ NeoPixel behavior
   2. calibration status from red-orange-whie-blue. The 
   3. blink every .5 seconds (blue) before the logging start every 15min (??:00, ??:15, ??:30, ??:45)
   4. blue without blinking when the data are being logged. 
+
 Note: One needs to calibrate before the logging starts. 
 
 Getting started with adafruit-feather with circuitpy 
