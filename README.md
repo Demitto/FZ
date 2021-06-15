@@ -16,6 +16,7 @@ NeoPixel behavior
 Note: One needs to calibrate before the logging starts. 
 
 ############################################################################
+
 Main PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
  -Coding Rules
    - fz.prt function is only used here except for the debugging/error purpose
@@ -34,4 +35,5 @@ Main PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
    - gps_i : if 1 : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
    - psd_i : if 1 : Spectral Analysis is conducted.
    - pix_val : The intensity of Neopixel (0-255)
+   
 ############################################################################
