@@ -18,6 +18,7 @@ Note: One needs to calibrate before the logging starts.
 ############################################################################
 
 Main PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
+
  -Coding Rules
    - fz.prt function is only used here except for the debugging/error purpose
 
