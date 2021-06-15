@@ -15,6 +15,12 @@ NeoPixel behavior
   4. blue without blinking when the data are being logged. 
 Note: One needs to calibrate before the logging starts. 
 
+Getting started with adafruit-feather with circuitpy 
+-First. Double click the reset button following the official description  
+  https://learn.adafruit.com/adafruit-feather-sense/circuitpython-on-feather-sense
+-Second. Copy either bno055.zip or bno08x.zip from this git-hub repository for the jump-start. 
+-Third. Play with the feather & IMUs. 
+
 ############################################################################
 
 Main PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
