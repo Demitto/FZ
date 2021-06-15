@@ -1,13 +1,13 @@
 # Feather-MZ                                         Last updated : Jun. 7, 2021
 
-This is repository for circuitpy codes for using IMUs prduced by adafruit.
+This is repository for circuitpython codes for using IMUs produced by adafruit.
 
 There are the following three main files 
   1. main.py  
   2. param.txt
   3. ./lib/fz.py
 
-  - The main.py is designed to overview the whole processes, while each process is written in fz.py. The runtime parameters can be specified by param.txt. Each parameter can be described in the head of main.py and at the end of this README.md.
+  - The main.py is designed to overview the whole processes, while each process is written in fz.py. The runtime parameters can be specified by param.txt. Description for each parameter can be found in the head of main.py and also at the end of this README.md.
 
 NeoPixel behavior 
   1. blink quickly (blue/green) once the board is powered.
