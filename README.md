@@ -16,10 +16,9 @@ NeoPixel behavior
 Note: One needs to calibrate before the logging starts. 
 
 Getting started with adafruit-feather with circuitpy 
-  -First. Double click the reset button following the official description  
-  https://learn.adafruit.com/adafruit-feather-sense/circuitpython-on-feather-sense
-  -Second. Copy either bno055.zip or bno08x.zip from this git-hub repository for the jump-start. 
-  -Third. Play with the feather & IMUs. 
+  First. Double click the reset button following the official description  https://learn.adafruit.com/adafruit-feather-sense/circuitpython-on-feather-sense
+  Second. Copy either bno055.zip or bno08x.zip from this git-hub repository for the jump-start. 
+  Third. Play with the feather & IMUs. 
 
 ############################################################################
 
