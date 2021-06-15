@@ -7,7 +7,7 @@ There are the following three main files
   2. param.txt
   3. ./lib/fz.py
 
-  The main.py is designed to overview the whole processes, while each process is written in fz.py. The runtime parameters can be specified by param.txt. Each parameter can be described in the head of main.py and at the end of this README.md.
+  - The main.py is designed to overview the whole processes, while each process is written in fz.py. The runtime parameters can be specified by param.txt. Each parameter can be described in the head of main.py and at the end of this README.md.
 
 NeoPixel behavior 
   1. blink quickly (blue/green) once the board is powered.
@@ -15,7 +15,7 @@ NeoPixel behavior
   3. blink every .5 seconds (blue) before the logging start every 15min (??:00, ??:15, ??:30, ??:45)
   4. blue without blinking when the data are being logged. 
 
-  Note: One needs to calibrate before the logging starts. 
+  - Note: One needs to calibrate before the logging starts. 
 
 Getting started with adafruit-feather with circuitpy 
   1. Double click the reset button following the official description  https://learn.adafruit.com/adafruit-feather-sense/circuitpython-on-feather-sense
