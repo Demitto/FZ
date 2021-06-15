@@ -15,25 +15,23 @@ NeoPixel behavior
   4. blue without blinking when the data are being logged. 
 Note: One needs to calibrate before the logging starts. 
 
-""" ############################################################################
-#    Main PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
-#
-# -Coding Rules
-#   - fz.prt function is only used here except for the debugging/error purpose
-#
-# -Notes
-#   The parameters specified in param.txt are as follows
-#   - T    : Sampling interval (second)
-#   - dt   : Sampling interval (second)
-#   - Nw   : The window size of the segment for the spectral analysis.
-#   - Ncut : The index of Cut-off Frequency for the frequency spectral Pzz.
-#   - imu_i : imu_i switches the IMU for logging as follows
-#       - 1 : BNO055
-#       - 2 : BNO08x
-#       - 3 : LSM6DS33
-#       - 4 : ISM330DXCX
-#   - gps_i : if 1 : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
-#   - psd_i : if 1 : Spectral Analysis is conducted.
-#   - pix_val : The intensity of Neopixel (0-255)
-#   ############################################################################
-"""
+############################################################################
+Main PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
+ -Coding Rules
+   - fz.prt function is only used here except for the debugging/error purpose
+
+ -Notes
+   The parameters specified in param.txt are as follows
+   - T    : Sampling interval (second)
+   - dt   : Sampling interval (second)
+   - Nw   : The window size of the segment for the spectral analysis.
+   - Ncut : The index of Cut-off Frequency for the frequency spectral Pzz.
+   - imu_i : imu_i switches the IMU for logging as follows
+       - 1 : BNO055
+       - 2 : BNO08x
+       - 3 : LSM6DS33
+       - 4 : ISM330DXCX
+   - gps_i : if 1 : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
+   - psd_i : if 1 : Spectral Analysis is conducted.
+   - pix_val : The intensity of Neopixel (0-255)
+############################################################################
