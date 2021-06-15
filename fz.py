@@ -1,5 +1,5 @@
 """
-Last updated : Jun. 7PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
+Last updated : Jun. 7PROGRAM OF FZ, Written by T.K.       Last updated : Jun. 7, 2021
 """
 import time
 import board
@@ -23,6 +23,15 @@ def prt(Fil_Log, Str):
     # Uncomment the following line for debugging
     # print(Str)
     return
+
+def npx_blk2(dt, pixels):
+    # Objective : Blink neopixel every dt seconds with the color specified by "pixels"
+    for j in range(1) :
+        pixels[0] = (0, 0, 255)
+        time.sleep(dt / 2)
+        pixels[0] = (0, 0, 0)
+        time.sleep(dt / 2)
+    return pixels
 
 def npx_blk(dt, pixels, pix_val):
     # Objective : Blink neopixel every dt seconds with the color specified by "pixels"
@@ -57,10 +66,12 @@ def ior_prm():
                 imu_i = int(line[:-1].split("=")[1])
             if "gps" in line:
                 gps_i = int(line[:-1].split("=")[1])
+            if "psd" in line:
+                psd_i = int(line[:-1].split("=")[1])
             if "pix_val" in line:
                 pix_val = int(line[:-1].split("=")[1])
     frq = ulab.linspace(2 * 3.14 / dt / Nw, 2 * 3.14 / dt, Nw)
-    return T, dt, Nw, Ncut, frq, imu_i, gps_i, pix_val
+    return T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val
 
 def dvc_ini(imu_i, gps_i, set_rtc, set_time):
     # Objective : Initialization : NeoPixel, I2C, SDcard, IMU, GPS, Output Folder
@@ -86,7 +97,7 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
     sdcard = adafruit_sdcard.SDCard(spi, cs)
     time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}".format(
         rtc_t.tm_year, rtc_t.tm_mon, rtc_t.tm_mday, rtc_t.tm_hour, rtc_t.tm_min)
-    Dir_Out = time_now + "_IMU"
+    Dir_Out = "data"
     vfs = storage.VfsFat(sdcard)
     storage.mount(vfs, "/sd")
 
@@ -94,6 +105,17 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
     if imu_i == 1 :
         import adafruit_bno055
         imu = adafruit_bno055.BNO055_I2C(i2c)
+        while not imu.calibrated:
+            if( num.sum(imu.calibration_status[1:4]) >= 9):
+                pixels[0] = (255, 255, 255)  # NeoPixiel Orange
+            elif( num.sum(imu.calibration_status[1:4]) >= 6):
+                pixels[0] = (255, 255, 0)  # NeoPixiel Orange
+            elif( num.sum(imu.calibration_status[1:4]) >= 3):
+                pixels[0] = (125, 0, 0)  # NeoPixiel Orange
+            else :
+                pixels[0] = (255, 0, 0)  # NeoPixiel Orange
+            time.sleep(1)
+
     elif imu_i == 2 :
         from adafruit_bno08x.i2c import BNO08X_I2C
         from adafruit_bno08x import (
@@ -108,6 +130,16 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
         imu.enable_feature(BNO_REPORT_MAGNETOMETER)
         imu.enable_feature(BNO_REPORT_ROTATION_VECTOR)
         imu.enable_feature(BNO_REPORT_LINEAR_ACCELERATION)
+        imu.begin_calibration()
+        while not (imu.calibration_status == 3):
+            if(imu.calibration_status == 2):
+                pixels[0] = (255, 255, 255)  # NeoPixiel Orange
+            elif(imu.calibration_status == 1):
+                pixels[0] = (255, 255, 0)  # NeoPixiel Orange
+            elif(imu.calibration_status == 0):
+                pixels[0] = (255, 0, 0)  # NeoPixiel Orange
+            time.sleep(1)
+        imu.save_calibration_data()
     elif imu_i == 3 :
         import adafruit_lsm6ds.lsm6ds33
         imu = adafruit_lsm6ds.lsm6ds33.LSM6DS33(i2c)
@@ -142,8 +174,7 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
         os.mkdir("/sd/" + Dir_Out)
     except OSError:
         pass
-    Fil_Log = "/sd/" + Dir_Out + "/Log_" + Dir_Out + ".txt"
-    return pixels, i2c, imu, gps, Dir_Out, Fil_Log
+    return pixels, i2c, imu, gps, Dir_Out
 
 def log_ini(i2c, pixels, pix_val):
     npx_blk(.1, pixels, pix_val)
@@ -151,14 +182,15 @@ def log_ini(i2c, pixels, pix_val):
     time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}".format(
         rtc_t.tm_year, rtc_t.tm_mon, rtc_t.tm_mday, rtc_t.tm_hour, rtc_t.tm_min)
     ts = time.monotonic()
-    return time_now, ts
+    Fil_Log = "/sd/data/Log_" + time_now + ".txt"
+    return time_now, ts, Fil_Log
 
 def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
     # Objective : Logging IMU data every dt seconds to Fil_raw
     # Read parameters
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, pix_val = ior_prm()
+    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
     # Logging duration is just 1 min less than T
-    T_log = T - 60
+    T_log = T - 120
     # Logging ...
     if (imu_i == 1) :
         Fil_raw = "/sd/{0}/IMU_BNO055_{1}.txt".format(Dir_Out, time_now)
@@ -171,7 +203,8 @@ def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
                 "bn5_a_x\tbn5_a_y\tbn5_a_z\t"
                 "bn5_gyx\tbn5_gyy\tbn5_gyz\t"
                 "bn5_e_h\tbn5_e_r\tbn5_e_p\t"
-                "bn5_g_x\tbn5_g_y\tbn5_g_z\r\n"
+                "bn5_g_x\tbn5_g_y\tbn5_g_z\t"
+                "cal_1\tcal_2\tcal_3\tcal_4\r\n"
             )
             out_f.flush()
             while t_n < T_log + dt:
@@ -182,7 +215,8 @@ def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.linear_acceleration)
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gyro)
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.euler)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\r\n" % imu.gravity)
+                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gravity)
+                    out_f.write("%8.4f\t%8.4f\t%8.4f\r\n" % imu.calibration_status)
                     i_l += 1
             out_f.flush()
     elif (imu_i == 2) :
@@ -196,7 +230,7 @@ def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
                 "time\t"
                 "bn8_a_x\tbn8_a_y\tbn8_a_z\t"
                 "bn8_l_x\tbn8_l_y\tbn8_l_z\t"
-                "bn8_gyx\tbn8_gyy\tbn8_gyz\r\n"
+                "bn8_gyx\tbn8_gyy\tbn8_gyz\tbn8cali\r\n"
             )
             out_f.flush()
             while t_n < T_log + dt:
@@ -206,7 +240,8 @@ def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
                     out_f.write("%10.5f\t" % t_n)
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.acceleration)
                     out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.linear_acceleration)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\r\n" % imu.gyro)
+                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gyro)
+                    out_f.write("%1d\r\n" % imu.calibration_status)
                     i_l += 1
             out_f.flush()
     elif (imu_i == 3) :
@@ -255,6 +290,7 @@ def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
     return Fil_raw, time_now, N_l
 
 def flt_low(Fil_raw, N_l, dt):
+    # only for bno055 yet
     Fil_low = Fil_raw[0:-4]+'_low.txt'
     N2 = int(1/dt/2)
     N1 = int(N_l/N2)
@@ -299,7 +335,7 @@ def psd_seg(F_IMU, N_low):
     # Objective : Read raw data and calculate the psd for "Nseg" segment"s".
     # The window size is N. The coordinate is converted to Earth Coordinate
     # following Bender et al., 2010.
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, pix_val = ior_prm()
+    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
     d2r = 3.1415 / 180.0
     ax, ay, az = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
     hd, rl, pc = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
@@ -374,7 +410,7 @@ def qsd(frq, X, Y, flag):
 
 def blk_sta(Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
     # Objective : Calculate the bulk wave statistics based on the psd & csd
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, pix_val = ior_prm()
+    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
     a1, b1 = ulab.zeros(len(Pxx)), ulab.zeros(len(Pxx))
     Mwd, Mds = ulab.zeros(len(Pxx)), ulab.zeros(len(Pxx))
     Hs = 4 * (num.sum(Pzz[Ncut:]) ** 0.5)

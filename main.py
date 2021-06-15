@@ -15,7 +15,8 @@
 #       - 2 : BNO08x
 #       - 3 : LSM6DS33
 #       - 4 : ISM330DXCX
-#   - gps_i : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
+#   - gps_i : if 1 : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
+#   - psd_i : if 1 : Spectral Analysis is conducted.
 #   - pix_val : The intensity of Neopixel (0-255)
 #   ############################################################################
 """
@@ -25,38 +26,41 @@ import time as t
 
 # Initizalize
 #   - 1. Import parameters
-T, dt, Nw, Ncut, frq, imu_i, gps_i, pix_val = fz.ior_prm()
+T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = fz.ior_prm()
 #   - 2. Setup each sensors (IMU, GPS, RTC, SD, Neopixel)
 set_rtc = False
-set_t = (2021, 6, 1, 16, 52, 10, 0, -1, -1)
-pixels, i2c, imu, gps, Dir_Out, Fil_Log = fz.dvc_ini(imu_i, gps_i, set_rtc, set_t)
-#   - 3. Create and flush the header to Log file
-fz.prt(Fil_Log, "\n****************************************")
-fz.prt(Fil_Log, "\n\nPRORGRAM FZ start ")
-fz.prt(Fil_Log, "\nT={:} (s)\t dt={:} (s)\t Nw={:} ".format(T, dt, Nw))
-fz.prt(Fil_Log, "\nLog file is {}".format(Fil_Log))
-fz.prt(Fil_Log, "\n\n****************************************")
+set_t = (2021, 6, 15, 9, 28, 0, 0, -1, -1)
+pixels, i2c, imu, gps, Dir_Out = fz.dvc_ini(imu_i, gps_i, set_rtc, set_t)
 
 while True:
+
+    # Start measurement every calendar 15min
+    while not (fz.rtc_now(i2c).tm_min % 15 == 0) :
+        fz.npx_blk2(1, pixels)
+
     # Initizalize for each measurement
-    time_now, ts = fz.log_ini(i2c, pixels, pix_val)
-    fz.prt(Fil_Log, "\n Measurement started on {} (yyyymmdd_HHMM)".format(time_now))
+    time_now, ts, Fil_Log = fz.log_ini(i2c, pixels, pix_val)
+    fz.prt(Fil_Log, "\n****************************************")
+    fz.prt(Fil_Log, "\n\nPRORGRAM FZ start ")
+    fz.prt(Fil_Log, "\nT={:} (s)\t dt={:} (s)\t Nw={:} ".format(T, dt, Nw))
+    fz.prt(Fil_Log, "\nLog file is {}".format(Fil_Log))
+    fz.prt(Fil_Log, "\n\t Measurement started on {} (yyyymmdd_HHMM)".format(time_now))
 
     # Logging GPS (only if gps_i == 1)
     if gps_i == 1 :
-        fz.prt(Fil_Log, "\n Recording GPS data ... ")
+        fz.prt(Fil_Log, "\nRecording GPS data ... ")
         while not gps.has_fix:
             gps.update()
         for i in range(2) :
             fz.prt(Fil_Log, "\n\t {}".format(gps.readline()))
 
     # Logging IMU (the sensor can be switched by imu_i )
-    fz.prt(Fil_Log, "\n\t Recording IMU data ... {:6.1f} sec".format(t.monotonic()-ts))
+    fz.prt(Fil_Log, "\nRecording IMU data ... {:6.1f} sec".format(t.monotonic()-ts))
     Fil_raw, time_now, N_l = fz.iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels)
     fz.prt(Fil_Log, "\n\t Logging finished. {1:5d} lines -> {0:}".format(Fil_raw, N_l))
 
     # Calculate wave statistics from IMU data
-    if True :
+    if psd_i == 1 :
         fz.prt(Fil_Log, "\n Data Analysis ... {:6.1f} sec".format(t.monotonic()-ts))
         fz.prt(Fil_Log, "\n\tLow pass filtering : {:6.1f} sec".format(t.monotonic()-ts))
         Fil_low, N_low = fz.flt_low(Fil_raw, N_l, dt)
@@ -77,5 +81,3 @@ while True:
     fz.prt(Fil_Log, "\ngc.mem_free() = {:6.1f}".format(gc.mem_free()))
     fz.prt(Fil_Log, "\n******************")
     pixels[0] = (pix_val, pix_val, pix_val)
-    if (T-(t.monotonic()-ts)) > 0 :
-        t.sleep(T-(t.monotonic()-ts))
