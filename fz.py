@@ -338,6 +338,7 @@ def psd_seg(F_IMU, N_low):
     d2r = 3.1415 / 180.0
     ax, ay, az = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
     hd, rl, pc = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
+    d_ax, d_ay, d_az = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
     Pxx, Pyy, Pzz = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
     Qxz, Qyz, Cxy = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
     with open(F_IMU, "r") as file:
@@ -346,22 +347,22 @@ def psd_seg(F_IMU, N_low):
         for seg in range(Nseg):
             for i in range(Nw):
                 dat = file.readline().split("\t")
-                ax[i], ay[i], az[i] = float(dat[1]), float(dat[2]), float(dat[3])
+                d_ax[i], d_ay[i], d_az[i] = float(dat[1]), float(dat[2]), float(dat[3])
                 hd[i], rl[i], pc[i] = float(dat[7]), float(dat[8]), float(dat[9])
             hd, rl, pc = hd * d2r, rl * d2r, pc * d2r
-            ax = (ax * cos(pc) * cos(hd) +
-                  ay * (sin(rl) * sin(pc) * cos(hd) - cos(rl) * sin(hd)) +
-                  az * (cos(rl) * sin(pc) * cos(hd) + sin(rl) * sin(hd)))
-            ay = (ax * cos(pc) * sin(hd) +
-                  ay * (sin(rl) * sin(pc) * sin(hd) + cos(rl) * cos(hd)) +
-                  az * (cos(rl) * sin(pc) * sin(hd) - sin(rl) * cos(hd)))
-            az = -ax * sin(pc) + ay * sin(rl) * cos(pc) + az * cos(rl) * cos(pc)
+            ax = (d_ax * cos(pc) * cos(hd) +
+                  d_ay * (sin(rl) * sin(pc) * cos(hd) - cos(rl) * sin(hd)) +
+                  d_az * (cos(rl) * sin(pc) * cos(hd) + sin(rl) * sin(hd)))
+            ay = (d_ax * cos(pc) * sin(hd) +
+                  d_ay * (sin(rl) * sin(pc) * sin(hd) + cos(rl) * cos(hd)) +
+                  d_az * (cos(rl) * sin(pc) * sin(hd) - sin(rl) * cos(hd)))
+            az = -d_ax * sin(pc) + d_ay * sin(rl) * cos(pc) + d_az * cos(rl) * cos(pc)
             Pxx += psd(frq, ax) / float(Nseg)
             Pyy += psd(frq, ay) / float(Nseg)
             Pzz += psd(frq, az) / float(Nseg)
-            Qxz += qsd(frq, ax, az, 1) / float(Nseg)
-            Qyz += qsd(frq, ay, az, 1) / float(Nseg)
-            Cxy += qsd(frq, ax, ay, 2) / float(Nseg)
+            Qxz += qsd(frq, ax, az, 2) / float(Nseg)
+            Qyz += qsd(frq, ay, az, 2) / float(Nseg)
+            Cxy += qsd(frq, ax, ay, 1) / float(Nseg)
 
     Fil_psd = F_IMU[0:-4] + "_psd.txt"
     with open(Fil_psd, "w") as f_psd:
@@ -401,9 +402,9 @@ def qsd(frq, X, Y, flag):
     # qst+i*qsi = ( xr - i*xi ) * (yr + i*yr)
     #           =  ( xr*yr + xi*yi) + i (-xi*yr + xr*yi)
     if flag == 1:
-        A = 2 * ffrx * ffry + ffix * ffiy
+        A = 2 * ( ffrx * ffry + ffix * ffiy )
     elif flag == 2:
-        A = 2 * ffrx * ffiy - ffix * ffry
+        A = 2 * ( ffrx * ffiy - ffix * ffry )
     A[int(len(A)/2):] = 0
     return A
 
