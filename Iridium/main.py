@@ -92,9 +92,8 @@ while True:
         if gps_i == 1 :
             while not gps.has_fix :
                 gps.update()
-            for i in range(2) :
-                data += struct.pack("f", gps.latitude)
-                data += struct.pack("f", gps.longitude)
+            data += struct.pack("f", gps.latitude)
+            data += struct.pack("f", gps.longitude)
         retry = 1
         rb.data_out = data
         status = rb.satellite_transfer()
