@@ -145,6 +145,11 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
     elif imu_i == 4 :
         from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
         imu = ISM330DHCX(i2c)
+    # Create Output folder
+    try:
+        os.mkdir("/sd/" + Dir_Out)
+    except OSError:
+        pass
 
     # Set up GPS if used
     if gps_i == 1 :
