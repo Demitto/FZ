@@ -1,0 +1,9 @@
+T  = 900
+dt = 0.0625
+Nw = 512
+Ncut = 10
+imu_i = 1
+gps_i = 0
+psd_i = 0
+iri_i = 0
+pix_val = 255
