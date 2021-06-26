@@ -432,5 +432,17 @@ def blk_sta(Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
     Mds = (2 * (1 - (a1 ** 2 + b1 ** 2) ** 0.5)) ** 0.5
     return Hs, Hsx, Hsy, Fp, Fpx, Fpy, Mwd, Mds
 
-def iri(data, length)
-    
+def iri(data)
+    retry = 1
+    rb.data_out = data
+    status = rb.satellite_transfer()
+    # For debucking
+    print(retry, status)
+    t.sleep(10)
+    while status[0] > 8:
+        retry += 1
+        rb.data_out = data
+        status = rb.satellite_transfer()
+        # For debucking
+        print(retry, status)
+        t.sleep(10)
