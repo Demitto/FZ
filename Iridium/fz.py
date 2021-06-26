@@ -93,6 +93,11 @@ def dvc_ini(imu_i, gps_i, set_rtc, set_time):
     spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
     cs = digitalio.DigitalInOut(SD_CS)
     sdcard = adafruit_sdcard.SDCard(spi, cs)
+    # Setup Lockblock iridium
+    if iri_i == 1 :
+        uart = board.UART()
+        uart.baudrate = 19200
+        rb = adafruit_rockblock.RockBlock(uart)
     # RTC Time Now
     # rtc_t = rtc_now(i2c)
     # time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}".format(
