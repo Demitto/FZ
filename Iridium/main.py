@@ -38,11 +38,6 @@ set_rtc = True
 set_t = (2021, 6, 24, 17, 00, 0, 0, -1, -1)
 pixels, i2c, imu, gps, Dir_Out = fz.dvc_ini(imu_i, gps_i, set_rtc, set_t)
 
-# RockBlock setup
-uart = board.UART()
-uart.baudrate = 19200
-rb = adafruit_rockblock.RockBlock(uart)
-
 while True:
 
     # Start measurement every calendar 15min
@@ -86,25 +81,15 @@ while True:
         fz.prt(Fil_Log, "\n\t\tHs_x={:5.3f}(m), Fp_x={:4.2f}(Hz)".format(Hsx, Fpx))
         fz.prt(Fil_Log, "\n\t\tHs_y={:5.3f}(m), Fp_z={:4.2f}(Hz)".format(Hsy, Fpy))
 
-        # Rockblock iridium transfer
-        data = struct.pack("f", Hs)
-        data += struct.pack("f", Fp)
-        if gps_i == 1 :
-            while not gps.has_fix :
-                gps.update()
-            data += struct.pack("f", gps.latitude)
-            data += struct.pack("f", gps.longitude)
-        retry = 1
-        rb.data_out = data
-        status = rb.satellite_transfer()
-        print(retry, status)
-        t.sleep(10)
-        while status[0] > 8:
-            retry += 1
-            rb.data_out = data
-            status = rb.satellite_transfer()
-            print(retry, status)
-            t.sleep(10)
+        if iri_i == 1 :
+            data = struct.pack("f", Hs)
+            data += struct.pack("f", Fp)
+            if gps_i == 1 :
+                while not gps.has_fix :
+                    gps.update()
+                data += struct.pack("f", gps.latitude)
+                data += struct.pack("f", gps.longitude)
+            fz.iri(data)
 
     # Finished ... wait for the next loop that starts just every T seconds
     #   - 1. the memory is checked.
