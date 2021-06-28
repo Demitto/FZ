@@ -24,6 +24,7 @@
 import gc
 import fz
 import time as t
+import struct
 
 # Initizalize
 #   - 1. Import parameters
