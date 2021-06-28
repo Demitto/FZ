@@ -32,11 +32,11 @@ import adafruit_rockblock
 
 # Initizalize
 #   - 1. Import parameters
-T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = fz.ior_prm()
+T, dt, Nw, Ncut, frq, imu_i, gps_i, iri_i, psd_i, pix_val = fz.ior_prm()
 #   - 2. Setup each sensors (IMU, GPS, RTC, SD, Neopixel)
 set_rtc = True
 set_t = (2021, 6, 24, 17, 00, 0, 0, -1, -1)
-pixels, i2c, imu, gps, Dir_Out = fz.dvc_ini(imu_i, gps_i, set_rtc, set_t)
+pixels, i2c, imu, gps, Dir_Out = fz.dvc_ini(imu_i, gps_i, iri_i, set_rtc, set_t)
 
 while True:
 
