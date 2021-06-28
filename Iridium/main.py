@@ -25,11 +25,6 @@ import gc
 import fz
 import time as t
 
-# for RockBlock iridium
-import struct
-import board
-import adafruit_rockblock
-
 # Initizalize
 #   - 1. Import parameters
 T, dt, Nw, Ncut, frq, imu_i, gps_i, iri_i, psd_i, pix_val = fz.ior_prm()
