@@ -68,12 +68,14 @@ def ior_prm():
                 gps_i = int(line[:-1].split("=")[1])
             if "psd" in line:
                 psd_i = int(line[:-1].split("=")[1])
+            if "iri" in line:
+                iri_i = int(line[:-1].split("=")[1])
             if "pix_val" in line:
                 pix_val = int(line[:-1].split("=")[1])
     frq = ulab.linspace(2 * 3.14 / dt / Nw, 2 * 3.14 / dt, Nw)
-    return T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val
+    return T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, iri_i, pix_val
 
-def dvc_ini(imu_i, gps_i, set_rtc, set_time):
+def dvc_ini(imu_i, gps_i, iri_i, set_rtc, set_time):
     # Objective : Initialization : NeoPixel, I2C, SDcard, IMU, GPS, Output Folder
     # Setup NeoPixel
     pixels = neopixel.NeoPixel(board.NEOPIXEL, 1)
