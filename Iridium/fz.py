@@ -6,7 +6,6 @@ import board
 import busio
 import os
 import neopixel
-import struct
 import ulab
 from ulab import numerical as num
 from ulab.vector import sin
