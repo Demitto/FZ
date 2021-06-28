@@ -201,7 +201,7 @@ def log_ini(i2c, pixels, pix_val):
 def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
     # Objective : Logging IMU data every dt seconds to Fil_raw
     # Read parameters
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
+    T, dt, Nw, Ncut, frq, imu_i, gps_i, iri_i, psd_i, pix_val = ior_prm()
     # Logging duration is just 1 min less than T
     T_log = T - 120
     # Logging ...
@@ -348,7 +348,7 @@ def psd_seg(F_IMU, N_low):
     # Objective : Read raw data and calculate the psd for "Nseg" segment"s".
     # The window size is N. The coordinate is converted to Earth Coordinate
     # following Bender et al., 2010.
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
+    T, dt, Nw, Ncut, frq, imu_i, gps_i, iri_i, psd_i, pix_val = ior_prm()
     d2r = 3.1415 / 180.0
     ax, ay, az = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
     hd, rl, pc = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
@@ -424,7 +424,7 @@ def qsd(frq, X, Y, flag):
 
 def blk_sta(Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
     # Objective : Calculate the bulk wave statistics based on the psd & csd
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
+    T, dt, Nw, Ncut, frq, imu_i, gps_i, iri_i, psd_i, pix_val = ior_prm()
     a1, b1 = ulab.zeros(len(Pxx)), ulab.zeros(len(Pxx))
     Mwd, Mds = ulab.zeros(len(Pxx)), ulab.zeros(len(Pxx))
     Hs = 4 * (num.sum(Pzz[Ncut:]) ** 0.5)
