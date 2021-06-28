@@ -6,6 +6,7 @@ import board
 import busio
 import os
 import neopixel
+import struct
 import ulab
 from ulab import numerical as num
 from ulab.vector import sin
@@ -14,6 +15,7 @@ import storage
 import digitalio
 import adafruit_sdcard
 import adafruit_pcf8523
+import adafruit_rockblock
 
 def prt(Fil_Log, Str):
     # Objective : Make logs of the microcontroller behavior
