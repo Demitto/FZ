@@ -1,11 +1,12 @@
 """
-Last updated : Jun. 7PROGRAM OF FZ, Written by T.K.       Last updated : Jun. 7, 2021
+Last updated : Jun. 7PROGRAM OF FZ, Written by T.K.       Last updated : Jul. 5, 2021
 """
 import time
 import board
 import busio
 import os
 import neopixel
+import array
 import ulab
 from ulab import numerical as num
 from ulab.vector import sin
@@ -14,6 +15,7 @@ import storage
 import digitalio
 import adafruit_sdcard
 import adafruit_pcf8523
+from micropython import const
 
 def prt(Fil_Log, Str):
     # Objective : Make logs of the microcontroller behavior
@@ -24,181 +26,173 @@ def prt(Fil_Log, Str):
     # print(Str)
     return
 
-def npx_blk2(dt, pixels):
-    # Objective : Blink neopixel every dt seconds with the color specified by "pixels"
-    for j in range(1) :
-        pixels[0] = (0, 0, 255)
+def npx_blk(dt, pix, col1, col2):
+    # Objective : Blink neopixel every dt seconds with the color specified by "pix"
+    for j in range(5) :
+        pix[0] = col1
         time.sleep(dt / 2)
-        pixels[0] = (0, 0, 0)
+        pix[0] = col2
         time.sleep(dt / 2)
-    return pixels
-
-def npx_blk(dt, pixels, pix_val):
-    # Objective : Blink neopixel every dt seconds with the color specified by "pixels"
-    for j in range(10) :
-        pixels[0] = (0, pix_val, 0)
-        time.sleep(dt / 2)
-        pixels[0] = (0, 0, pix_val)
-        time.sleep(dt / 2)
-    return pixels
-
-def rtc_now(i2c):
-    # Create the RTC instance:
-    rtc = adafruit_pcf8523.PCF8523(i2c)
-    return rtc.datetime
+    return pix
 
 def ior_prm():
-    # Objective : read parameters N,dt, and T from "/param.txt"
-    # N  : the number of calculation samples
-    # dt : time step for data logging [s]
-    # T  : total time for data logging [s]
+    # Objective : read input parameters from "/param.txt"
     with open("param.txt", "r") as fp:
         for line in fp:
-            if "dt" in line:
-                dt = float(line[:-1].split("=")[1])
-            if "T" in line:
+            if "T_imu" in line:
+                T_imu = float(line[:-1].split("=")[1])
+            elif "T" in line:
                 T = float(line[:-1].split("=")[1])
+            if "Hz1" in line:
+                Hz1 = int(line[:-1].split("=")[1])
+            if "Hz2" in line:
+                Hz2 = int(line[:-1].split("=")[1])
             if "Nw" in line:
                 Nw = int(line[:-1].split("=")[1])
             if "Ncut" in line:
                 Ncut = int(line[:-1].split("=")[1])
             if "imu" in line:
                 imu_i = int(line[:-1].split("=")[1])
+            if "cal" in line:
+                cal_i = int(line[:-1].split("=")[1])
             if "gps" in line:
                 gps_i = int(line[:-1].split("=")[1])
+            if "sen" in line:
+                sen_i = int(line[:-1].split("=")[1])
             if "psd" in line:
                 psd_i = int(line[:-1].split("=")[1])
             if "pix_val" in line:
-                pix_val = int(line[:-1].split("=")[1])
-    frq = ulab.linspace(2 * 3.14 / dt / Nw, 2 * 3.14 / dt, Nw)
-    return T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val
+                pval = int(line[:-1].split("=")[1])
+    frq = ulab.linspace(2 * 3.14 * Hz2 / Nw, 2 * 3.14 * Hz2, Nw)
+    return T, T_imu, Hz1, Hz2, Nw, Ncut, frq, imu_i, cal_i, gps_i, sen_i, psd_i, pval
 
-def dvc_ini(imu_i, gps_i, set_rtc, set_time):
-    # Objective : Initialization : NeoPixel, I2C, SDcard, IMU, GPS, Output Folder
-    # Setup NeoPixel
-    pixels = neopixel.NeoPixel(board.NEOPIXEL, 1)
-    # Blink fast to show the system is initializing
-    pixels = npx_blk(0.05, pixels, 255)
+def dvc_ini(T, imu_i, cal_i, gps_i, sen_i, pval, set_rtc, set_time):
+    # Objective : Initialization : NeoPixel, I2C, SDcard, Output directory, Sensors
+
+    # Setup NeoPixel--->Blink fast to show the system is initializing
+    pix = neopixel.NeoPixel(board.NEOPIXEL, 1)
+    pix = npx_blk(0.1, pix, [0, pval, 0], [0, 0, pval])
+
     # Setup I2C
     i2c = busio.I2C(board.SCL, board.SDA)
+
     # Setup RTC
+    rtc = adafruit_pcf8523.PCF8523(i2c)
     if(set_rtc) :
-        rtc = adafruit_pcf8523.PCF8523(i2c)
         rtc.datetime = time.struct_time(set_time)
-        t = rtc.datetime
-        print("The date is {}/{}/{}".format(t.tm_mday, t.tm_mon, t.tm_year))
-        print("The time is {}:{:02}:{:02}".format(t.tm_hour, t.tm_min, t.tm_sec))
+
     # Setup SD card / sdioio or adafruit_sdcard
     SD_CS = board.D10
     spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
     cs = digitalio.DigitalInOut(SD_CS)
     sdcard = adafruit_sdcard.SDCard(spi, cs)
-    # RTC Time Now
-    # rtc_t = rtc_now(i2c)
-    # time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}".format(
-    #    rtc_t.tm_year, rtc_t.tm_mon, rtc_t.tm_mday, rtc_t.tm_hour, rtc_t.tm_min)
     Dir_Out = "data"
     vfs = storage.VfsFat(sdcard)
     storage.mount(vfs, "/sd")
+
+    # Create Output folder
+    try:
+        os.mkdir("/sd/" + Dir_Out)
+    except OSError:
+        pass
 
     # Setup IMU
     if imu_i == 1 :
         import adafruit_bno055
         imu = adafruit_bno055.BNO055_I2C(i2c)
-        while not imu.calibrated:
-            if(num.sum(imu.calibration_status[1:4]) >= 9):
-                pixels[0] = (255, 255, 255)  # NeoPixiel Orange
-            elif(num.sum(imu.calibration_status[1:4]) >= 6):
-                pixels[0] = (255, 255, 0)  # NeoPixiel Orange
-            elif(num.sum(imu.calibration_status[1:4]) >= 3):
-                pixels[0] = (125, 0, 0)  # NeoPixiel Orange
-            else :
-                pixels[0] = (255, 0, 0)  # NeoPixiel Orange
-            time.sleep(1)
-    elif imu_i == 2 :
-        from adafruit_bno08x.i2c import BNO08X_I2C
-        from adafruit_bno08x import (
-            BNO_REPORT_ACCELEROMETER,
-            BNO_REPORT_GYROSCOPE,
-            BNO_REPORT_MAGNETOMETER,
-            BNO_REPORT_ROTATION_VECTOR,
-            BNO_REPORT_LINEAR_ACCELERATION)
-        imu = BNO08X_I2C(i2c)
-        imu.enable_feature(BNO_REPORT_ACCELEROMETER)
-        imu.enable_feature(BNO_REPORT_GYROSCOPE)
-        imu.enable_feature(BNO_REPORT_MAGNETOMETER)
-        imu.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-        imu.enable_feature(BNO_REPORT_LINEAR_ACCELERATION)
-        imu.begin_calibration()
-        while not (imu.calibration_status == 3):
-            if(imu.calibration_status == 2):
-                pixels[0] = (255, 255, 255)  # NeoPixiel Orange
-            elif(imu.calibration_status == 1):
-                pixels[0] = (255, 255, 0)  # NeoPixiel Orange
-            elif(imu.calibration_status == 0):
-                pixels[0] = (255, 0, 0)  # NeoPixiel Orange
-            time.sleep(1)
-        imu.save_calibration_data()
-    elif imu_i == 3 :
-        import adafruit_lsm6ds.lsm6ds33
-        imu = adafruit_lsm6ds.lsm6ds33.LSM6DS33(i2c)
-    elif imu_i == 4 :
-        from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
-        imu = ISM330DHCX(i2c)
-    # Create Output folder
-    try:
-        os.mkdir("/sd/" + Dir_Out)
-    except OSError:
-        pass
+        imu.mode = adafruit_bno055.NDOF_FMC_OFF_MODE
+        if cal_i == 1 :
+            while not imu.calibrated:
+                if(num.sum(imu.calibration_status[1:4]) >= 9):
+                    pix[0] = (pval, pval, pval)  # NeoPixiel Orange
+                elif(num.sum(imu.calibration_status[1:4]) >= 6):
+                    pix[0] = (pval, pval, 0)  # NeoPixiel Orange
+                elif(num.sum(imu.calibration_status[1:4]) >= 3):
+                    pix[0] = (pval/2, 0, 0)  # NeoPixiel Orange
+                else :
+                    pix[0] = (pval, 0, 0)  # NeoPixiel Orange
+                time.sleep(.2)
+                print(imu.calibration_status)
+            pix[0] = (0, 0, pval)  # NeoPixiel Orange
+    else:
+        imu = []
+
+    # Setup other sensors if used
+    if sen_i == 1 :
+        import adafruit_bmp280
+        bmp = adafruit_bmp280.Adafruit_BMP280_I2C(i2c)
+        import audiobusio
+        mic = audiobusio.PDMIn(board.MICROPHONE_CLOCK, board.MICROPHONE_DATA,
+                               sample_rate=16000, bit_depth=16)
+        micv = array.array('H', [0] * 160)
+        mic.record(micv, len(micv))
+        import adafruit_sht31d
+        hmd = adafruit_sht31d.SHT31D(i2c)
+    else:
+        bmp, mic, micv, hmd = [], [], [], []
 
     # Set up GPS if used
+    pix[0] = [pval, 0, 0]  # NeoPixiel Red1
     if gps_i == 1 :
-        gps_log = True
-    else :
-        gps_log = False
-
-    if gps_log:
         import adafruit_gps
-        # uart = busio.UART(board.TX, board.RX, baudrate=9600, timeout=10)
-        # gps = adafruit_gps.GPS(uart, debug=False)
         gps = adafruit_gps.GPS_GtopI2C(i2c, debug=False)
-        gps.send_command(b"PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
-        gps.send_command(b"PMTK220,1000")
-        gps.update()
-        pixels[0] = (255, 0, 0)  # NeoPixiel Red1
-        while not gps.has_fix:
-            pixels[0] = (255, 0, 0)  # NeoPixiel Red1
+        pass_i = 0
+        while (pass_i == 0) :
+            try :
+                gps.send_command(b'PMTK225,0')
+                pass_i = 1
+            except OSError:
+                time.sleep(.45)
+        pix[0] = (pval, int(pval/4), 0)  # NeoPixiel Red1
+        while not (gps.has_fix) :
             gps.update()
-            pixels[0] = (0, 0, 0)  # NeoPixiel Red1
-        Dir_Out = Dir_Out + "_GPS"
+        gps.send_command(b'PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0')
+        gps.send_command(b"PMTK220,1000")
+        for i in range(4) :
+            print(gps.readline())
+        rtc.datetime = time.struct_time(gps.timestamp_utc)
     else:
-        gps = 1
-    # Create Output folder
-    try:
-        os.mkdir("/sd/" + Dir_Out)
-    except OSError:
-        pass
-    return pixels, i2c, imu, gps, Dir_Out
+        gps = []
+    return pix, i2c, rtc, imu, gps, bmp, mic, micv, hmd
 
-def log_ini(i2c, pixels, pix_val):
-    npx_blk(.1, pixels, pix_val)
-    rtc_t = rtc_now(i2c)
-    time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}".format(
-        rtc_t.tm_year, rtc_t.tm_mon, rtc_t.tm_mday, rtc_t.tm_hour, rtc_t.tm_min)
+def gps_log(i2c, gps, rtc, pix, pval) :
+    pix[0] = (pval, int(pval/4), 0)  # NeoPixiel Red1
+    pass_i = 0
+    while (pass_i == 0) :
+        try :
+            gps.send_command(b"PMTK225,0")
+            gps.update()
+            pass_i = 1
+        except OSError:
+            time.sleep(.45)
+    while not (gps.has_fix) :
+        gps.update()
+    for i in range(10) :
+        gps.update()
+        nmea = str(gps.readline(), "ascii").strip()
+        # print(gps.update(), gps.has_fix, nmea, gps.latitude, gps.longitude)
+    # print(gps.datetime, '\r\n')
+    lat = gps.latitude
+    lon = gps.longitude
+    gps.send_command(b"PMTK225,1,60000,1140000,360000000,300000")
+    pix[0] = (0, 0, pval)  # NeoPixiel Blue
+    return nmea, lat, lon
+
+def log_ini(i2c, rtc, pix, pval):
+    npx_blk(.5, pix, [0, pval, 0], [0, 0, pval])
+    time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}{:02d}".format(
+        rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday,
+        rtc.datetime.tm_hour, rtc.datetime.tm_min, rtc.datetime.tm_sec)
     ts = time.monotonic()
     Fil_Log = "/sd/data/Log_" + time_now + ".txt"
     return time_now, ts, Fil_Log
 
-def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
-    # Objective : Logging IMU data every dt seconds to Fil_raw
-    # Read parameters
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
-    # Logging duration is just 1 min less than T
-    T_log = T - 120
-    # Logging ...
+def iow_imu(time_now, T, T_imu, Hz1, Hz2, i2c, imu, imu_i, pix):
+    # Objective : Logging IMU data every dt seconds to Fil_low
+    Dir_Out = "data"
     if (imu_i == 1) :
-        Fil_raw = "/sd/{0}/IMU_BNO055_{1}.txt".format(Dir_Out, time_now)
-        with open(Fil_raw, "w") as out_f:
+        Fil_low = "/sd/{0}/IMU_BNO055_{1}.txt".format(Dir_Out, time_now)
+        with open(Fil_low, "w") as out_f:
             t_s = time.monotonic()  # Time after the feather board is on
             t_n = time.monotonic() - t_s  # Time after the logging is started
             i_l = 1  # index of the logging for checking error
@@ -211,135 +205,60 @@ def iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels):
                 "cal_1\tcal_2\tcal_3\tcal_4\r\n"
             )
             out_f.flush()
-            while t_n < T_log + dt:
+            i, tr, acc, gyr, eul, grv, cal = 0, 0, [], [], [], [], []
+            while t_n < T_imu + 1/Hz1 :
                 t_n = time.monotonic() - t_s
-                if t_n >= dt * float(i_l):
-                    t_n = time.monotonic() - t_s
-                    out_f.write("%10.5f\t" % t_n)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.linear_acceleration)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gyro)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.euler)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gravity)
-                    out_f.write("%1d\t%1d\t%1d\t%1d\r\n" % imu.calibration_status)
+                if t_n >= float(i_l)/Hz1 :
                     i_l += 1
+                    i += 1
+                    tr += t_n
+                    acc += imu.linear_acceleration
+                    gyr += imu.gyro
+                    eul += imu.euler
+                    grv += imu.gravity
+                    cal += imu.calibration_status
+                    if((i_l / Hz1 * Hz2) % 1 == 0) :
+                        tr = tr/i
+                        # print([i, i_l, tr])
+                        acc = [sum(acc[j::3])/i for j in range(3)]
+                        gyr = [sum(gyr[j::3])/i for j in range(3)]
+                        eul = [sum(eul[j::3])/i for j in range(3)]
+                        grv = [sum(grv[j::3])/i for j in range(3)]
+                        cal = [sum(cal[j::3])/i for j in range(4)]
+                        # print(acc)
+                        out_f.write("%10.5f\t" % tr)
+                        out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(acc))
+                        out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(gyr))
+                        out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(eul))
+                        out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(grv))
+                        out_f.write("%1d\t%1d\t%1d\t%1d\r\n" % tuple(cal))
+                        i, tr, acc, gyr, eul, grv, cal = 0, 0, [], [], [], [], []
             out_f.flush()
-    elif (imu_i == 2) :
-        Fil_raw = "/sd/{0}/IMU_BNO08x_{1}.txt".format(Dir_Out, time_now)
-        # Logging ...
-        with open(Fil_raw, "w") as out_f:
-            t_s = time.monotonic()  # Time after the feather board is on
-            t_n = time.monotonic() - t_s  # Time after the logging is started
-            i_l = 1  # index of the logging for checking error
-            out_f.write(
-                "time\t"
-                "bn8_a_x\tbn8_a_y\tbn8_a_z\t"
-                "bn8_l_x\tbn8_l_y\tbn8_l_z\t"
-                "bn8_gyx\tbn8_gyy\tbn8_gyz\tbn8cali\r\n"
-            )
-            out_f.flush()
-            while t_n < T_log + dt:
-                t_n = time.monotonic() - t_s
-                if t_n >= dt * float(i_l):
-                    t_n = time.monotonic() - t_s
-                    out_f.write("%10.5f\t" % t_n)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.acceleration)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.linear_acceleration)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.gyro)
-                    out_f.write("%1d\r\n" % imu.calibration_status)
-                    i_l += 1
-            out_f.flush()
-    elif (imu_i == 3) :
-        Fil_raw = "/sd/{0}/IMU_LSM6DS33_{1}.txt".format(Dir_Out, time_now)
-        with open(Fil_raw, "w") as out_f:
-            t_s = time.monotonic()  # Time after the feather board is on
-            t_n = time.monotonic() - t_s  # Time after the logging is started
-            i_l = 1  # index of the logging for checking error
-            out_f.write(
-                "time\t"
-                "lsm_a_x\tlsm_a_y\tlsm_a_z\t"
-                "lsm_gyx\tlsm_gyy\tlsm_gyz\r\n"
-            )
-            out_f.flush()
-            while t_n < T_log + dt:
-                t_n = time.monotonic() - t_s
-                if t_n >= dt * float(i_l):
-                    t_n = time.monotonic() - t_s
-                    out_f.write("%10.5f\t" % t_n)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.acceleration)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\r\n" % imu.gyro)
-                    i_l += 1
-            out_f.flush()
-    elif (imu_i == 4) :
-        Fil_raw = "/sd/{0}/IMU_ISM330DXCX_{1}.txt".format(Dir_Out, time_now)
-        with open(Fil_raw, "w") as out_f:
-            t_s = time.monotonic()  # Time after the feather board is on
-            t_n = time.monotonic() - t_s  # Time after the logging is started
-            i_l = 1  # index of the logging for checking error
-            out_f.write(
-                "time\t"
-                "ism_a_x\tism_a_y\tism_a_z\t"
-                "ism_gyx\tism_gyy\tism_gyz\r\n"
-            )
-            out_f.flush()
-            while t_n < T_log + dt:
-                t_n = time.monotonic() - t_s
-                if t_n >= dt * float(i_l):
-                    t_n = time.monotonic() - t_s
-                    out_f.write("%10.4f\t" % t_n)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % imu.acceleration)
-                    out_f.write("%8.4f\t%8.4f\t%8.4f\r\n" % imu.gyro)
-                    i_l += 1
-            out_f.flush()
-    N_l = lin_nmb(Fil_raw)
-    return Fil_raw, time_now, N_l
+        file = open(Fil_low, "r")
+        N_l = 0
+        for line in file:
+            if line != "\n":
+                N_l += 1
+        file.close()
+    return Fil_low, time_now, N_l
 
-def flt_low(Fil_raw, N_l, dt):
-    # only for bno055 yet
-    Fil_low = Fil_raw[0:-4]+'_low.txt'
-    N2 = int(1/dt/2)
-    N1 = int(N_l/N2)
-    t1 = ulab.zeros(N2)
-    ax, ay, az = ulab.zeros(N2), ulab.zeros(N2), ulab.zeros(N2)
-    gx, gy, gz = ulab.zeros(N2), ulab.zeros(N2), ulab.zeros(N2)
-    hd, rl, pc = ulab.zeros(N2), ulab.zeros(N2), ulab.zeros(N2)
-    with open(Fil_raw, "r") as in_f:
-        header = in_f.readline()
-        with open(Fil_low, "w") as out_f:
-            out_f.write(header)
-            for i in range(N1) :
-                for j in range(N2) :
-                    dat = in_f.readline().split("\t")
-                    t1[j] = float(dat[0])
-                    ax[j], ay[j], az[j] = float(dat[1]), float(dat[2]), float(dat[3])
-                    gx[j], gy[j], gz[j] = float(dat[4]), float(dat[5]), float(dat[6])
-                    hd[j], rl[j], pc[j] = float(dat[7]), float(dat[8]), float(dat[9])
-                out_f.write("%10.5f\t" % num.mean(t1))
-                out_f.write("%8.4f\t" % num.mean(ax))
-                out_f.write("%8.4f\t" % num.mean(ay))
-                out_f.write("%8.4f\t" % num.mean(az))
-                out_f.write("%8.4f\t" % num.mean(gx))
-                out_f.write("%8.4f\t" % num.mean(gy))
-                out_f.write("%8.4f\t" % num.mean(gz))
-                out_f.write("%8.4f\t" % num.median(hd))
-                out_f.write("%8.4f\t" % num.mean(rl))
-                out_f.write("%8.4f\r\n" % num.mean(pc))
-    return Fil_low, N1
+def imu_chg(imu, mode_i):
+    if mode_i == 0 :
+        # imu.accel_mode = adafruit_bno055.ACCEL_SUSPEND_MODE
+        # imu.gyro_mode = adafruit_bno055.GYRO_SUSPEND_MODE
+        # imu.magnet_mode = adafruit_bno055.MAGNET_SUSPEND_MODE
+        imu._write_register(const(0x3E), const(0x02))
+    elif mode_i == 1 :
+        # imu.accel_mode = adafruit_bno055.ACCEL_NORMAL_MODE
+        # imu.gyro_mode = adafruit_bno055.GYRO_NORMAL_MODE
+        # imu.magnet_mode = adafruit_bno055.MAGNET_REGULAR_MODE
+        imu._write_register(const(0x3E), const(0x00))
 
-def lin_nmb(F_IMU):
-    # Objective : Calculate the number of lines in the file "F_IMU"
-    file = open(F_IMU, "r")
-    N_l = 0
-    for line in file:
-        if line != "\n":
-            N_l += 1
-    file.close()
-    return N_l
 
-def psd_seg(F_IMU, N_low):
+def psd_seg(F_IMU, N_low, Nw, frq) :
     # Objective : Read raw data and calculate the psd for "Nseg" segment"s".
     # The window size is N. The coordinate is converted to Earth Coordinate
     # following Bender et al., 2010.
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
     d2r = 3.1415 / 180.0
     ax, ay, az = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
     hd, rl, pc = ulab.zeros(Nw), ulab.zeros(Nw), ulab.zeros(Nw)
@@ -368,7 +287,6 @@ def psd_seg(F_IMU, N_low):
             Qxz += qsd(frq, ax, az, 2) / float(Nseg)
             Qyz += qsd(frq, ay, az, 2) / float(Nseg)
             Cxy += qsd(frq, ax, ay, 1) / float(Nseg)
-
     Fil_psd = F_IMU[0:-4] + "_psd.txt"
     with open(Fil_psd, "w") as f_psd:
         for j in range(Nw/2) :
@@ -407,15 +325,14 @@ def qsd(frq, X, Y, flag):
     # qst+i*qsi = ( xr - i*xi ) * (yr + i*yr)
     #           =  ( xr*yr + xi*yi) + i (-xi*yr + xr*yi)
     if flag == 1:
-        A = 2 * ( ffrx * ffry + ffix * ffiy )
+        A = 2 * (ffrx * ffry + ffix * ffiy)
     elif flag == 2:
-        A = 2 * ( ffrx * ffiy - ffix * ffry )
+        A = 2 * (ffrx * ffiy - ffix * ffry)
     A[int(len(A)/2):] = 0
     return A
 
-def blk_sta(Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
+def blk_sta(Ncut, frq, Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
     # Objective : Calculate the bulk wave statistics based on the psd & csd
-    T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = ior_prm()
     a1, b1 = ulab.zeros(len(Pxx)), ulab.zeros(len(Pxx))
     Mwd, Mds = ulab.zeros(len(Pxx)), ulab.zeros(len(Pxx))
     Hs = 4 * (num.sum(Pzz[Ncut:]) ** 0.5)

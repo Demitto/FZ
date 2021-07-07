@@ -1,82 +1,107 @@
 """ ############################################################################
-#    Main PROGRAM OF FZ, Written by T.K.             Last updated : Jun. 7, 2021
+#    Main PROGRAM OF FZ, Written by T.K.             Last updated : Jul. 5, 2021
 #
 # -Coding Rules
 #   - fz.prt function is only used here except for the debugging/error purpose
 #
 # -Notes
 #   The parameters specified in param.txt are as follows
-#   - T    : Sampling interval (second)
-#   - dt   : Sampling interval (second)
-#   - Nw   : The window size of the segment for the spectral analysis.
-#   - Ncut : The index of Cut-off Frequency for the frequency spectral Pzz.
-#   - imu_i : imu_i switches the IMU for logging as follows
-#       - 1 : BNO055
-#       - 2 : BNO08x
-#       - 3 : LSM6DS33
-#       - 4 : ISM330DXCX
-#   - gps_i : GPS data (GPSRMC & GPSGGA) are logged before logging IMU.
-#   - pix_val : The intensity of Neopixel (0-255)
+#   - T       : Measurement Cycle [s]
+#   - T_imu   : IMU logging time [s] (Note: T_imu < T)
+#   - Hz1     : IMU Sampling Frequency 1 [Hz]
+#   - Hz2     : IMU Output interval 2 [Hz]
+#   - Nw      : The window size of the segment for the spectral analysis.
+#   - Ncut    : The index of Cut-off Frequency for the frequency spectral Pzz.
+#   - imu_i   : if 1, IMU data are logged.
+#   - cal_i   : if 1, IMU is calibrated before the first measurement (imu_i should be 1)
+#   - psd_i   : if 1, PSD and bulk wave statistics are calculated (imu_i should be 1)
+#   - gps_i   : if 1, GPS data aree logged
+#   - sen_i   : if 1, Feather Sense data (Air Temp., Air Pres., Noise Level) are logged
+#   - pix_val (pval) : The intensity of Neopixel (0-255)
 #   ############################################################################
 """
 import gc
+from math import sqrt as sqrt
 import fz
 import time as t
 
-# Initizalize
-#   - 1. Import parameters
-T, dt, Nw, Ncut, frq, imu_i, gps_i, psd_i, pix_val = fz.ior_prm()
-#   - 2. Setup each sensors (IMU, GPS, RTC, SD, Neopixel)
-set_rtc = False
-set_t = (2021, 6, 15, 9, 28, 0, 0, -1, -1)
-pixels, i2c, imu, gps, Dir_Out = fz.dvc_ini(imu_i, gps_i, set_rtc, set_t)
+# 1. Initizalize
+#   - 0. Optional: Set RTC if set_rtc == True
+sett = False
+rt = (2021, 7, 2, 13, 15, 5, 0, -1, -1)
+#    1-1. Import parameters
+T, T_imu, Hz1, Hz2, Nw, Ncut, frq, imu_i, cal_i, gps_i, sen_i, psd_i, pval = \
+    fz.ior_prm()
+#    1-2. Setup each sensors (IMU, GPS, RTC, SD, Neopixel)
+pix, i2c, rtc, imu, gps, bmp, mic, micv, hmd = \
+    fz.dvc_ini(T, imu_i, cal_i, gps_i, sen_i, pval, sett, rt)
 
+# 2. Measurement Loop
 while True:
 
-    # Start measurement every calendar 15min
-    while not (fz.rtc_now(i2c).tm_min % 15 == 0) :
-        fz.npx_blk2(1, pixels)
+    # 2-0. Start measurement every calendar int(T/60) minutes
+    if True :
+        fz.imu_chg(imu, 0)
+        while not (rtc.datetime.tm_min % int(T/60) == 0) :
+            fz.npx_blk(1, pix, [0, 0, pval], [0, 0, 0])
+        fz.imu_chg(imu, 1)
 
-    # Initizalize for each measurement
-    time_now, ts, Fil_Log = fz.log_ini(i2c, pixels, pix_val)
-    fz.prt(Fil_Log, "\n****************************************")
-    fz.prt(Fil_Log, "\n\nPRORGRAM FZ start ")
-    fz.prt(Fil_Log, "\nT={:} (s)\t dt={:} (s)\t Nw={:} ".format(T, dt, Nw))
-    fz.prt(Fil_Log, "\nLog file is {}".format(Fil_Log))
-    fz.prt(Fil_Log, "\n\t Measurement started on {} (yyyymmdd_HHMM)".format(time_now))
+    # 2-1. Initizalize for each measurement
+    time_now, ts, Fil_Log = fz.log_ini(i2c, rtc, pix, pval)
+    fz.prt(Fil_Log, "\n************************************************************")
+    fz.prt(Fil_Log, "\n\t\tFZ Measurement Log")
+    fz.prt(Fil_Log, "\n************************************************************")
+    fz.prt(Fil_Log, "\nMeasurement starts ... \t {:6.1f} [s]".format(t.monotonic()-ts))
+    fz.prt(Fil_Log, "\n\tThe start date_time is {} (yyyymmdd_HHMM)".format(time_now))
+    fz.prt(Fil_Log, "\n\tLog file is {}".format(Fil_Log))
+    fz.prt(Fil_Log, "\n\tIMU data file is IMU_BNO055_{0}.txt".format(time_now))
+    fz.prt(Fil_Log, "\n\tInput parameters are as follows \r\n".format(time_now))
+    with open("param.txt", "r") as fp:
+        for line in fp:
+            fz.prt(Fil_Log, "\t\t{}".format(line))
 
-    # Logging GPS (only if gps_i == 1)
+    # 2-2.Logging GPS (only if gps_i == 1)
     if gps_i == 1 :
-        fz.prt(Fil_Log, "\nRecording GPS data ... ")
-        while not gps.has_fix:
-            gps.update()
-        for i in range(2) :
-            fz.prt(Fil_Log, "\n\t {}".format(gps.readline()))
+        fz.prt(Fil_Log, "\nRecording GPS data ... \t{:6.1f}[s]".format(t.monotonic()-ts))
+        nmea, lat, lon = fz.gps_log(i2c, gps, rtc, pix, pval)
+        fz.prt(Fil_Log, "\n\tlatitude = {:.5f}".format(lat))
+        fz.prt(Fil_Log, "\n\tlongitude = {:.5f}".format(lon))
+        fz.prt(Fil_Log, "\n\tNMEA output (RMC)")
+        fz.prt(Fil_Log, "\n\t {}".format(nmea))
 
-    # Logging IMU (the sensor can be switched by imu_i )
-    fz.prt(Fil_Log, "\nRecording IMU data ... {:6.1f} sec".format(t.monotonic()-ts))
-    Fil_raw, time_now, N_l = fz.iow_imu(Dir_Out, time_now, i2c, imu, imu_i, pixels)
-    fz.prt(Fil_Log, "\n\t Logging finished. {1:5d} lines -> {0:}".format(Fil_raw, N_l))
+    # 2-3. Logging BMP280 temperature and barometric pressure(only if sen_i == 1)
+    if sen_i == 1 :
+        fz.prt(Fil_Log, "\n\nRecording Air data ...\t{:6.1f}[s]".format(t.monotonic()-ts))
+        fz.prt(Fil_Log, "\n\tAir Temperaure : {:.2f} C".format(bmp.temperature))
+        fz.prt(Fil_Log, "\n\tAir Pressure   : {:.2f} hPa".format(bmp.pressure))
+        fz.prt(Fil_Log, "\n\tAir Humidity   : {:.2f} %".format(hmd.relative_humidity))
+        minb = int(sum(micv) / len(micv))
+        fz.prt(Fil_Log, "\n\tSound level    : {} ".format(
+               int(sqrt(sum(float(x - minb) * (x - minb) for x in micv) / len(micv)))))
 
-    # Calculate wave statistics from IMU data
+    # 2-4. Logging IMU (the sensor can be switched by imu_i )
+    fz.prt(Fil_Log, "\n\nRecording IMU data ... \t {:6.1f} [s]".format(t.monotonic()-ts))
+    Fil_low, time_now, N_l = \
+        fz.iow_imu(time_now, T, T_imu, Hz1, Hz2, i2c, imu, imu_i, pix)
+    fz.prt(Fil_Log, "\n\tLogging finished ...")
+    fz.prt(Fil_Log, "\n\t\t The number of lines : {:5d}".format(N_l))
+    fz.prt(Fil_Log, "\n\t\t ---> {}".format(Fil_low))
+
+    # 3. Calculate wave statistics from IMU data
     if psd_i == 1 :
-        fz.prt(Fil_Log, "\n Data Analysis ... {:6.1f} sec".format(t.monotonic()-ts))
-        fz.prt(Fil_Log, "\n\tLow pass filtering : {:6.1f} sec".format(t.monotonic()-ts))
-        Fil_low, N_low = fz.flt_low(Fil_raw, N_l, dt)
-
-        fz.prt(Fil_Log, "\n\tEstimates psd　    : {:6.1f} sec".format(t.monotonic()-ts))
-        Pxx, Pyy, Pzz, Qxz, Qyz, Cxy = fz.psd_seg(Fil_low, N_low)
-
-        fz.prt(Fil_Log, "\n\tCal wave stats.　  : {:6.1f} sec".format(t.monotonic()-ts))
-        Hs, Hsx, Hsy, Fp, Fpx, Fpy, Mwd, Mds = fz.blk_sta(Pxx, Pyy, Pzz, Qxz, Qyz, Cxy)
-
+        fz.prt(Fil_Log, "\n\nIMU Data Analysis ... \t {:6.1f} [s]".format(t.monotonic()-ts))
+        fz.prt(Fil_Log, "\n\tEstimates PSD ...")
+        gc.collect()
+        # fz.prt(Fil_Log, "\n\tgc.mem_free() = {:6.1f}".format(gc.mem_free()))
+        Pxx, Pyy, Pzz, Qxz, Qyz, Cxy = fz.psd_seg(Fil_low, N_l, Nw, frq)
+        fz.prt(Fil_Log, "\n\tCalculate bulk wave statistics ...")
+        Hs, Hsx, Hsy, Fp, Fpx, Fpy, Mwd, Mds = \
+            fz.blk_sta(Ncut, frq, Pxx, Pyy, Pzz, Qxz, Qyz, Cxy)
         fz.prt(Fil_Log, "\n\t\tHs={:5.3f}(m), Fp={:4.2f}(Hz)".format(Hs, Fp))
         fz.prt(Fil_Log, "\n\t\tHs_x={:5.3f}(m), Fp_x={:4.2f}(Hz)".format(Hsx, Fpx))
         fz.prt(Fil_Log, "\n\t\tHs_y={:5.3f}(m), Fp_z={:4.2f}(Hz)".format(Hsy, Fpy))
 
-    # Finished ... wait for the next loop that starts just every T seconds
-    #   - 1. the memory is checked.
-    #   - 2. Neopixel turns to be white.
-    fz.prt(Fil_Log, "\ngc.mem_free() = {:6.1f}".format(gc.mem_free()))
-    fz.prt(Fil_Log, "\n******************")
-    pixels[0] = (pix_val, pix_val, pix_val)
+    # 4. Finished
+    gc.collect()
+    fz.prt(Fil_Log, "\n\nMeasurement finished : \t {:6.1f} [s]".format(t.monotonic()-ts))
+    fz.prt(Fil_Log, "\n************************************************************")
