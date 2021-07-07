@@ -23,24 +23,25 @@ Getting started with adafruit-feather with circuitpy
   2. Copy bno055.zip from this git-hub repository for the jump-start. 
   3. Play with the feather & IMUs. 
 
-############################################################################
-#    Main PROGRAM OF FZ, Written by T.K.             Last updated : Jul. 5, 2021
-#
-# -Coding Rules
-#   - fz.prt function is only used here except for the debugging/error purpose
-#
-# -Notes
-#   The parameters specified in param.txt are as follows
-#   - T       : Measurement Cycle [s]
-#   - T_imu   : IMU logging time [s] (Note: T_imu < T)
-#   - Hz1     : IMU Sampling Frequency 1 [Hz]
-#   - Hz2     : IMU Output interval 2 [Hz]
-#   - Nw      : The window size of the segment for the spectral analysis.
-#   - Ncut    : The index of Cut-off Frequency for the frequency spectral Pzz.
-#   - imu_i   : if 1, IMU data are logged.
-#   - cal_i   : if 1, IMU is calibrated before the first measurement (imu_i should be 1)
-#   - psd_i   : if 1, PSD and bulk wave statistics are calculated (imu_i should be 1)
-#   - gps_i   : if 1, GPS data aree logged
-#   - sen_i   : if 1, Feather Sense data (Air Temp., Air Pres., Noise Level) are logged
-#   - pix_val (pval) : The intensity of Neopixel (0-255)
-############################################################################
+
+****************************************************************************
+*    Main PROGRAM OF FZ, Written by T.K.             Last updated : Jul. 5, 2021
+*
+* -Coding Rules
+*   - fz.prt function is only used here except for the debugging/error purpose
+*
+* -Notes
+*   The parameters specified in param.txt are as follows
+*   - T       : Measurement Cycle [s]
+*   - T_imu   : IMU logging time [s] (Note: T_imu < T)
+*   - Hz1     : IMU Sampling Frequency 1 [Hz]
+*   - Hz2     : IMU Output interval 2 [Hz]
+*   - Nw      : The window size of the segment for the spectral analysis.
+*   - Ncut    : The index of Cut-off Frequency for the frequency spectral Pzz.
+*   - imu_i   : if 1, IMU data are logged.
+*   - cal_i   : if 1, IMU is calibrated before the first measurement (imu_i should be 1)
+*   - psd_i   : if 1, PSD and bulk wave statistics are calculated (imu_i should be 1)
+*   - gps_i   : if 1, GPS data aree logged
+*   - sen_i   : if 1, Feather Sense data (Air Temp., Air Pres., Noise Level) are logged
+*   - pix_val (pval) : The intensity of Neopixel (0-255)
+****************************************************************************
