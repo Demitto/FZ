@@ -23,7 +23,7 @@ Getting started with adafruit-feather with circuitpy
   2. Copy bno055.zip from this git-hub repository for the jump-start. 
   3. Play with the feather & IMUs. 
 
-""" ############################################################################
+############################################################################
 #    Main PROGRAM OF FZ, Written by T.K.             Last updated : Jul. 5, 2021
 #
 # -Coding Rules
@@ -43,4 +43,4 @@ Getting started with adafruit-feather with circuitpy
 #   - gps_i   : if 1, GPS data aree logged
 #   - sen_i   : if 1, Feather Sense data (Air Temp., Air Pres., Noise Level) are logged
 #   - pix_val (pval) : The intensity of Neopixel (0-255)
-#   ############################################################################
+############################################################################
