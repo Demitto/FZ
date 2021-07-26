@@ -23,7 +23,7 @@ def prt(Fil_Log, Str):
         flog.write(Str)
         flog.flush()
     # Uncomment the following line for debugging
-    # print(Str)
+    print(Str)
     return
 
 def npx_blk(dt, pix, col1, col2):
@@ -71,7 +71,7 @@ def dvc_ini(T, imu_i, cal_i, gps_i, sen_i, pval, set_rtc, set_time):
 
     # Setup NeoPixel--->Blink fast to show the system is initializing
     pix = neopixel.NeoPixel(board.NEOPIXEL, 1)
-    pix = npx_blk(0.1, pix, [0, pval, 0], [0, 0, pval])
+    pix = npx_blk(0.1, pix, [0, 0, pval], [0, pval, 0])
 
     # Setup I2C
     i2c = busio.I2C(board.SCL, board.SDA)
@@ -102,18 +102,26 @@ def dvc_ini(T, imu_i, cal_i, gps_i, sen_i, pval, set_rtc, set_time):
         imu = adafruit_bno055.BNO055_I2C(i2c)
         imu.mode = adafruit_bno055.NDOF_FMC_OFF_MODE
         if cal_i == 1 :
+            dt = .125
             while not imu.calibrated:
-                if(num.sum(imu.calibration_status[1:4]) >= 9):
-                    pix[0] = (pval, pval, pval)  # NeoPixiel Orange
-                elif(num.sum(imu.calibration_status[1:4]) >= 6):
-                    pix[0] = (pval, pval, 0)  # NeoPixiel Orange
-                elif(num.sum(imu.calibration_status[1:4]) >= 3):
-                    pix[0] = (pval/2, 0, 0)  # NeoPixiel Orange
-                else :
-                    pix[0] = (pval, 0, 0)  # NeoPixiel Orange
-                time.sleep(.2)
+                for i in range(1, 4):
+                    pval = imu.calibration_status[i]*20
+                    pix[0] = (10, 10, 10)
+                    time.sleep(dt)
+                    if(i == 0):
+                        pix[0] = (pval, pval, pval)
+                    if(i == 1):
+                        pix[0] = (pval, 0, 0)
+                    if(i == 2):
+                        pix[0] = (0, pval, 0)
+                    if(i == 3):
+                        pix[0] = (0, 0, pval)
+                    time.sleep(dt)
+                    if(imu.calibration_status[i] == 3) :
+                        pval = 60
+                        pix[0] = (pval, pval, pval)
+                        time.sleep(dt)
                 print(imu.calibration_status)
-            pix[0] = (0, 0, pval)  # NeoPixiel Orange
     else:
         imu = []
 
@@ -132,51 +140,76 @@ def dvc_ini(T, imu_i, cal_i, gps_i, sen_i, pval, set_rtc, set_time):
         bmp, mic, micv, hmd = [], [], [], []
 
     # Set up GPS if used
-    pix[0] = [pval, 0, 0]  # NeoPixiel Red1
     if gps_i == 1 :
         import adafruit_gps
         gps = adafruit_gps.GPS_GtopI2C(i2c, debug=False)
-        pass_i = 0
-        while (pass_i == 0) :
-            try :
-                gps.send_command(b'PMTK225,0')
-                pass_i = 1
-            except OSError:
-                time.sleep(.45)
-        pix[0] = (pval, int(pval/4), 0)  # NeoPixiel Red1
-        while not (gps.has_fix) :
-            gps.update()
-        gps.send_command(b'PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0')
+        gps_ini(i2c, gps, rtc, pix, pval)
+        # gps.send_command(b'PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0')
+        gps.send_command(b'PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0')
         gps.send_command(b"PMTK220,1000")
-        for i in range(4) :
-            print(gps.readline())
+        while not (gps.has_fix) :
+            pix[0] = (pval, 0, 0)  # NeoPixiel Red1
+            gps.update()
+            time.sleep(.25)
+            pix[0] = (0, pval, 0)  # NeoPixiel Red1
+            time.sleep(.25)
+        gps.update()
         rtc.datetime = time.struct_time(gps.timestamp_utc)
     else:
         gps = []
     return pix, i2c, rtc, imu, gps, bmp, mic, micv, hmd
 
-def gps_log(i2c, gps, rtc, pix, pval) :
-    pix[0] = (pval, int(pval/4), 0)  # NeoPixiel Red1
+def gps_ini(i2c, gps, rtc, pix, pval) :
     pass_i = 0
     while (pass_i == 0) :
+        pix[0] = (0, 0, 0)  # NeoPixiel Red1
         try :
             gps.send_command(b"PMTK225,0")
-            gps.update()
+            gps.send_command(b"PMTK223,1,25,180000,60000")
             pass_i = 1
         except OSError:
-            time.sleep(.45)
-    while not (gps.has_fix) :
+            time.sleep(.5)
+        pix[0] = (0, pval, 0)  # NeoPixiel Blue
+    return
+
+def gps_log(gps, T, pix, pval) :
+    t1 = time.monotonic()
+    while not gps.has_fix:
+        pix[0] = (pval/2, pval/2, pval/2)  # NeoPixiel Red1
         gps.update()
-    for i in range(10) :
-        gps.update()
-        nmea = str(gps.readline(), "ascii").strip()
-        # print(gps.update(), gps.has_fix, nmea, gps.latitude, gps.longitude)
-    # print(gps.datetime, '\r\n')
-    lat = gps.latitude
-    lon = gps.longitude
-    gps.send_command(b"PMTK225,1,60000,1140000,360000000,300000")
-    pix[0] = (0, 0, pval)  # NeoPixiel Blue
-    return nmea, lat, lon
+        time.sleep(.25)
+        pix[0] = (0, pval, 0)  # NeoPixiel Red1
+    gps_type = []
+    while gps_type != "$GNRMC" :
+        nmea1 = str(gps.readline(), "ascii").strip()
+        if(len(nmea1.split(',')) > 6) :
+            if nmea1.split(',')[2] == 'A' :
+                gps_type = nmea1.split(',')[0]
+        time.sleep(.1)
+    nmea2 = str(gps.readline(), "ascii").strip()
+    if(nmea1.split(',')[4] == 'N'):
+        lat = float(nmea1.split(',')[3])
+    elif(nmea1.split(',')[4] == 'S'):
+        lat = -float(nmea1.split(',')[3])
+    else :
+        lat = -100
+    if(nmea1.split(',')[6] == 'E'):
+        lon = float(nmea1.split(',')[5])
+    elif(nmea1.split(',')[6] == 'W'):
+        lon = -float(nmea1.split(',')[5])
+    else :
+        lon = -1000
+    t2 = time.monotonic()
+
+    str1 = "PMTK225,2,5000," + str(int((T-(t2-t1)-60)*1e3)) + ",3600000,1000"
+    gps.send_command(bytearray(str1))
+    # gps_type = []
+    # while gps_type != "$PMTK001" :
+    #     gps.send_command(bytearray(str1))
+    #     tmp = str(gps.readline(), "ascii").strip().split(',')
+    #     gps_type = tmp[0]
+    # time.sleep(1)
+    return nmea1, nmea2, lat, lon
 
 def log_ini(i2c, rtc, pix, pval):
     npx_blk(.5, pix, [0, pval, 0], [0, 0, pval])

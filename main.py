@@ -43,8 +43,10 @@ while True:
     if True :
         fz.imu_chg(imu, 0)
         while not (rtc.datetime.tm_min % int(T/60) == 0) :
-            fz.npx_blk(1, pix, [0, 0, pval], [0, 0, 0])
+            fz.npx_blk(1, pix, [0, 0, 0], [0, 0, pval])
         fz.imu_chg(imu, 1)
+    # Green !
+    pix[0] = (0, pval, 0)
 
     # 2-1. Initizalize for each measurement
     time_now, ts, Fil_Log = fz.log_ini(i2c, rtc, pix, pval)
@@ -55,23 +57,29 @@ while True:
     fz.prt(Fil_Log, "\n\tThe start date_time is {} (yyyymmdd_HHMM)".format(time_now))
     fz.prt(Fil_Log, "\n\tLog file is {}".format(Fil_Log))
     fz.prt(Fil_Log, "\n\tIMU data file is IMU_BNO055_{0}.txt".format(time_now))
-    fz.prt(Fil_Log, "\n\tInput parameters are as follows \r\n".format(time_now))
-    with open("param.txt", "r") as fp:
-        for line in fp:
-            fz.prt(Fil_Log, "\t\t{}".format(line))
+    # fz.prt(Fil_Log, "\n\tInput parameters are as follows \r\n")
+    # with open("param.txt", "r") as fp:
+    #    for line in fp:
+    #        fz.prt(Fil_Log, "\t\t{}".format(line))
 
     # 2-2.Logging GPS (only if gps_i == 1)
     if gps_i == 1 :
-        fz.prt(Fil_Log, "\nRecording GPS data ... \t{:6.1f}[s]".format(t.monotonic()-ts))
-        nmea, lat, lon = fz.gps_log(i2c, gps, rtc, pix, pval)
-        fz.prt(Fil_Log, "\n\tlatitude = {:.5f}".format(lat))
-        fz.prt(Fil_Log, "\n\tlongitude = {:.5f}".format(lon))
-        fz.prt(Fil_Log, "\n\tNMEA output (RMC)")
-        fz.prt(Fil_Log, "\n\t {}".format(nmea))
+        fz.prt(Fil_Log, "\nRecording GPS data ...\t{:6.1f}[s]".format(t.monotonic()-ts))
+        fz.gps_ini(i2c, gps, rtc, pix, pval)
+        if((t.monotonic()-ts) > (T - T_imu)*1.5) :
+            fz.prt(Fil_Log, "\nRecording GPS failed ...")
+            t.sleep(max(T - (t.monotonic()-ts) - 10 , 0))
+            continue
+        nmea1, nmea2, lat, lon = fz.gps_log(gps, T - (t.monotonic()-ts) - 10, pix, pval)
+        fz.prt(Fil_Log, "\n\tlatitude = {:9.4f}".format(lat))
+        fz.prt(Fil_Log, "\n\tlongitude = {:9.4f}".format(lon))
+        fz.prt(Fil_Log, "\n\tNMEA output (RMC and GGA)")
+        fz.prt(Fil_Log, "\n\t {}\n".format(nmea1))
+        fz.prt(Fil_Log, "\n\t {}\n".format(nmea2))
 
     # 2-3. Logging BMP280 temperature and barometric pressure(only if sen_i == 1)
     if sen_i == 1 :
-        fz.prt(Fil_Log, "\n\nRecording Air data ...\t{:6.1f}[s]".format(t.monotonic()-ts))
+        fz.prt(Fil_Log, "\nRecording Air data ...\t{:6.1f}[s]".format(t.monotonic()-ts))
         fz.prt(Fil_Log, "\n\tAir Temperaure : {:.2f} C".format(bmp.temperature))
         fz.prt(Fil_Log, "\n\tAir Pressure   : {:.2f} hPa".format(bmp.pressure))
         fz.prt(Fil_Log, "\n\tAir Humidity   : {:.2f} %".format(hmd.relative_humidity))
@@ -80,16 +88,18 @@ while True:
                int(sqrt(sum(float(x - minb) * (x - minb) for x in micv) / len(micv)))))
 
     # 2-4. Logging IMU (the sensor can be switched by imu_i )
-    fz.prt(Fil_Log, "\n\nRecording IMU data ... \t {:6.1f} [s]".format(t.monotonic()-ts))
+    fz.prt(Fil_Log, "\n\nRecording IMU data ...\t{:6.1f} [s]".format(t.monotonic()-ts))
+    # Blue !
+    pix[0] = (0, 0, pval)
     Fil_low, time_now, N_l = \
         fz.iow_imu(time_now, T, T_imu, Hz1, Hz2, i2c, imu, imu_i, pix)
     fz.prt(Fil_Log, "\n\tLogging finished ...")
     fz.prt(Fil_Log, "\n\t\t The number of lines : {:5d}".format(N_l))
-    fz.prt(Fil_Log, "\n\t\t ---> {}".format(Fil_low))
+    fz.prt(Fil_Log, "\n\t\t ---> {}\n".format(Fil_low))
 
     # 3. Calculate wave statistics from IMU data
     if psd_i == 1 :
-        fz.prt(Fil_Log, "\n\nIMU Data Analysis ... \t {:6.1f} [s]".format(t.monotonic()-ts))
+        fz.prt(Fil_Log, "\nIMU Data Analysis ...\t{:6.1f}[s]".format(t.monotonic()-ts))
         fz.prt(Fil_Log, "\n\tEstimates PSD ...")
         gc.collect()
         # fz.prt(Fil_Log, "\n\tgc.mem_free() = {:6.1f}".format(gc.mem_free()))
@@ -103,5 +113,5 @@ while True:
 
     # 4. Finished
     gc.collect()
-    fz.prt(Fil_Log, "\n\nMeasurement finished : \t {:6.1f} [s]".format(t.monotonic()-ts))
+    fz.prt(Fil_Log, "\n\nMeasurement finished :\t{:6.1f} [s]".format(t.monotonic()-ts))
     fz.prt(Fil_Log, "\n************************************************************")
