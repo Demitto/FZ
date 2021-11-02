@@ -148,11 +148,10 @@ def ini_all(imu_i, cal_i, gps_i, sen_i, iri_i, set_rtc, set_time):
     # Set up GPS if used
     if gps_i == 1:
         import adafruit_gps
-
         gps = adafruit_gps.GPS_GtopI2C(i2c, debug=False)
         gps.gps_switch = digitalio.DigitalInOut(board.A2)
         gps.gps_switch.direction = digitalio.Direction.OUTPUT
-        nmea1, nmea2, lat, lon = log_gps(i2c, gps, rtc, npx)
+        nmea1, nmea2, lat, lon = log_gps(gps, rtc, npx)
     else:
         gps = []
 
