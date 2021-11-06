@@ -13,8 +13,3 @@ NeoPixel behavior
   2. blue is used for IMU: blinking until IMU logging start.
   3. green is used for GPS: blinking until GPS fix is obtained.
   - Note: Red-Blue blinking is used for IMU calibration (only happen with cal_i = 1)
-
-Getting started with adafruit-feather with circuitpy 
-  1. Double click the reset button following the official description  https://learn.adafruit.com/adafruit-feather-sense/circuitpython-on-feather-sense
-  2. Copy FZ_all.zip from this git-hub repository for the jump-start. 
-  3. Play with the feather & IMUs. 
