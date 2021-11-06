@@ -89,8 +89,10 @@ def prm():
                 psd_i = int(line[:-1].split("=")[1])
             if "iri" in line:
                 iri_i = int(line[:-1].split("=")[1])
+            if "wdt" in line:
+                iri_i = int(line[:-1].split("=")[1])
     frq = linspace(1e-10, 2 * 3.14 * Hz2 * (Nw - 1) / Nw, Nw)
-    return T1, T2, Hz1, Hz2, Nw, Nc, frq, imu_i, cal_i, gps_i, sen_i, psd_i, iri_i
+    return T1, T2, Hz1, Hz2, Nw, Nc, frq, imu_i, cal_i, gps_i, sen_i, psd_i, iri_i, wdt_i
 
 
 def ini_all(imu_i, cal_i, gps_i, sen_i, iri_i, set_rtc, set_time):
@@ -409,3 +411,17 @@ def iri(rb, Hs, Fp, Pzz, lat, lon, npx, Fil_Log) :
         npx = LED(1, npx, [npx.v, 0, 0], [npx.v/3, npx.v/3, npx.v/3], 10)
     rb.switch.value = False
     return rb_sent, Nr
+
+## Added by T.Ka (2021/11/06)
+
+def ini_wdt(timeout) :
+    import microcontroller
+    import watchdog
+
+    wdt = microcontroller.watchdog
+    wdt.timeout = timeout
+    wdt.mode = watchdog.WatchDogMode.RESET
+    wdt.feed()
+    return wdt
+
+##

@@ -10,3 +10,4 @@ gps_i = 0
 sen_i = 1
 psd_i = 1
 iri_i = 0
+wdt_i = 1

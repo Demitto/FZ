@@ -35,13 +35,17 @@ if True :
     sett = False
     rt = (2021, 7, 2, 13, 15, 5, 0, -1, -1)
     #    1-1. Import parameters
-    T1, T2, Hz1, Hz2, Nw, Nc, frq, imu_i, cal_i, gps_i, sen_i, psd_i, iri_i = fz.prm()
+    T1, T2, Hz1, Hz2, Nw, Nc, frq, imu_i, cal_i, gps_i, sen_i, psd_i, iri_i, wdt_i = fz.prm()
     #    1-2. Setup each sensors (IMU, GPS, RTC, SD, Neopixel)
     npx, i2c, rtc, imu, mgn, gps, bmp, mic, micv, hmd, gps_i, rb = \
         fz.ini_all(imu_i, cal_i, gps_i, sen_i, iri_i, sett, rt)
+    #    1-3. Setup watch dog timer
+    if wdt_i == 1 :
+        wdt = fz.ini_wdt(T1*2)
 
 # 2. Measurement Loop
 try :
+
     while True:
         # 2-1. Initizalize for each measurement
         time_now, ts, Fil_Log = fz.ini_log(T1, imu, rtc, npx)
@@ -105,6 +109,7 @@ try :
         gc.collect()
         fz.prt(Fil_Log, "\n\nFinished after {:6.1f} [s]".format(t.monotonic()-ts))
         fz.prt(Fil_Log, "\n**********************************************************")
+        wdt.feed()
 # Reboot when error
 except OSError :
     supervisor.reload()
