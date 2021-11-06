@@ -1,5 +1,5 @@
 """ ############################################################################
-#    Subroutine programs OF FZ, Written by T.K.      Last updated : Nov. 2, 2021
+#    Subroutine programs OF FZ, Written by T.K.      Last updated : Nov. 5, 2021
 #
 # -Overbies of each subroutines
 #   -prt(Fil_Log, Str) :
@@ -8,15 +8,17 @@
 #       - Blink the neopixel. The interval dt and color col1/col2 and the iteration Nb
 #   -prm() :
 #       - Install the parameter settings from param.txt
-#   -ini_all(imu_i, cal_i, gps_i, sen_i, set_rtc, set_time) :
-#       - Initialize all the selected devices based on ???_i index from prm.
-#   -ini_log(T1, imu, rtc, npx) :
+#   -ini_sp_(0x02, set_rtc, set_time):
+#       - Special initialization (IMU calibration or RTC set)
+#   -ini_log(T1, rtc, npx) :
 #       - Initializaion for each measurements (waiting, gps, etc)
-#   -log_gps(gps, rtc, npx) :
+#   -log_sen(i2c)
+#       - Logging other sensors.
+#   -log_gps(i2c, rtc, npx):
 #       - Logging gps (only at once in each measurement cycles).
-#   -log_imu(time_now, T2, Hz1, Hz2, imu, mgn, npx) :
+#   -log_imu(time_now, T2, Hz1, Hz2, i2c, npx):
 #       - Logging imu at Hz2 (sampled at Hz1 and subsample Hz2 via ave.)
-#   -cal_spc(F_IMU, Nl, Nw, frq) :
+#   -cal_spc(F_IMU, Nl, Nw, frq):
 #      -Spectral Analysis based on the following three types of the calculation.
 #      -cal_psd(frq, X):
 #           - Calculate power spectral density
@@ -24,7 +26,7 @@
 #           - Calculate quadrature spectral density
 #      -cal_blk(Ncut, frq, Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
 #           - Calculate bulk wave statistics
-#   -iri(rb, Hs, Fp, Pzz, lat, lon, npx, Fil_Log) :
+#   -iri(Hs, Fp, Pzz, lat, lon, npx, Fil_Log) :
 #       - Satellite Data Transfer using Iridium-SBD (RockBlock 9603)
 #   ############################################################################
 """
@@ -34,9 +36,8 @@ import busio
 import os
 import neopixel
 import array
-from ulab import numerical as num
-from ulab import zeros, linspace, vector, fft
-from ulab.vector import sin, cos
+from ulab import numpy as num
+from ulab.numpy import zeros, linspace, fft, sin, cos, floor, atan
 import storage
 import digitalio
 import adafruit_sdcard
@@ -52,7 +53,6 @@ def prt(Fil_Log, Str):
     # print(Str)
     return
 
-
 def LED(dt, npx, col1, col2, Nb):
     for j in range(Nb):
         npx[0] = col1
@@ -60,7 +60,6 @@ def LED(dt, npx, col1, col2, Nb):
         npx[0] = col2
         time.sleep(dt / 2)
     return npx
-
 
 def prm():
     with open("param.txt", "r") as fp:
@@ -89,16 +88,13 @@ def prm():
                 psd_i = int(line[:-1].split("=")[1])
             if "iri" in line:
                 iri_i = int(line[:-1].split("=")[1])
-            if "wdt" in line:
-                iri_i = int(line[:-1].split("=")[1])
     frq = linspace(1e-10, 2 * 3.14 * Hz2 * (Nw - 1) / Nw, Nw)
-    return T1, T2, Hz1, Hz2, Nw, Nc, frq, imu_i, cal_i, gps_i, sen_i, psd_i, iri_i, wdt_i
+    return T1, T2, Hz1, Hz2, Nw, Nc, frq, imu_i, cal_i, gps_i, sen_i, psd_i, iri_i
 
-
-def ini_all(imu_i, cal_i, gps_i, sen_i, iri_i, set_rtc, set_time):
+def ini_sp_(cal_i, set_rtc, set_time):
     # Setup NeoPixel--->Blink fast to show the system is initializing
     npx = neopixel.NeoPixel(board.NEOPIXEL, 1)
-    npx.v = 250
+    npx.v = 3
     npx = LED(0.2, npx, [0, 0, npx.v], [0, npx.v, 0], 10)
     # Setup I2C
     i2c = busio.I2C(board.SCL, board.SDA)
@@ -106,6 +102,40 @@ def ini_all(imu_i, cal_i, gps_i, sen_i, iri_i, set_rtc, set_time):
     rtc = adafruit_pcf8523.PCF8523(i2c)
     if set_rtc:
         rtc.datetime = time.struct_time(set_time)
+
+    # IMU Calibration (if cal_i == 1 )
+    import adafruit_bno055_ext as adafruit_bno055
+    imu = adafruit_bno055.BNO055_I2C(i2c)
+    if cal_i == 1:
+        nmea1, nmea2, lat, lon = log_gps(i2c, rtc, npx)
+        while not imu.calibrated:
+            print(imu.calibration_status)
+            print(imu.offsets_accelerometer, imu.radius_accelerometer)
+            print(imu.offsets_magnetometer, imu.radius_magnetometer)
+            if(num.sum(imu.calibration_status) > 6) :
+                LED(0.50, npx, [npx.v, 0, 0], [0, 0, npx.v], 2)
+            elif(num.sum(imu.calibration_status) > 9) :
+                LED(0.25, npx, [npx.v, 0, 0], [0, 0, npx.v], 4)
+            else :
+                LED(1.00, npx, [npx.v, 0, 0], [0, 0, npx.v], 1)
+        cald, cald2 = imu.get_calibration()
+        print("Calibration Finished")
+        print(cald)
+        print(cald2)
+        imu.set_calibration(cald2)
+        print(imu.calibration_status)
+        print(imu.offsets_accelerometer, imu.radius_accelerometer)
+        print(imu.offsets_magnetometer, imu.radius_magnetometer)
+    time.sleep(0.5)
+    imu.mode = adafruit_bno055.CONFIG_MODE
+    time.sleep(0.5)
+    imu._write_register(const(0x3E), const(0x02))
+
+    return npx, i2c, rtc
+
+def ini_log(T1, rtc, npx):
+    LED(0.5, npx, [0, 0, npx.v], [0, npx.v, 0], 5)
+
     # Setup SD card / sdioio or adafruit_sdcard
     SD_CS = board.D10
     spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
@@ -113,68 +143,7 @@ def ini_all(imu_i, cal_i, gps_i, sen_i, iri_i, set_rtc, set_time):
     sdcard = adafruit_sdcard.SDCard(spi, cs)
     vfs = storage.VfsFat(sdcard)
     storage.mount(vfs, "/sd")
-    # Setup IMU
-    if imu_i == 1:
-        import adafruit_bno055
 
-        imu = adafruit_bno055.BNO055_I2C(i2c)
-        # imu.mode = adafruit_bno055.NDOF_FMC_OFF_MODE
-        if cal_i == 1:
-            while not imu.calibrated:
-                npx = LED(0.1, npx, [0, 0, npx.v], [npx.v / 3, npx.v / 3, npx.v / 3], 2)
-                print(imu.calibration_status)
-        mgn = []
-    else:
-        imu = []
-        mgn = []
-    # Setup other sensors if used
-    if sen_i == 1:
-        import adafruit_bmp280
-
-        bmp = adafruit_bmp280.Adafruit_BMP280_I2C(i2c)
-        import audiobusio
-
-        mic = audiobusio.PDMIn(
-            board.MICROPHONE_CLOCK,
-            board.MICROPHONE_DATA,
-            sample_rate=16000,
-            bit_depth=16,
-        )
-        micv = array.array("H", [0] * 160)
-        mic.record(micv, len(micv))
-        import adafruit_sht31d
-
-        hmd = adafruit_sht31d.SHT31D(i2c)
-    else:
-        bmp, mic, micv, hmd = [], [], [], []
-    # Set up GPS if used
-    if gps_i == 1:
-        import adafruit_gps
-        gps = adafruit_gps.GPS_GtopI2C(i2c, debug=False)
-        gps.gps_switch = digitalio.DigitalInOut(board.A2)
-        gps.gps_switch.direction = digitalio.Direction.OUTPUT
-        nmea1, nmea2, lat, lon = log_gps(gps, rtc, npx)
-    else:
-        gps = []
-
-    # Setup Lockblock iridium if used
-    if iri_i == 1:
-        import adafruit_rockblock
-
-        uart = board.UART()
-        uart.baudrate = 19200
-        rb = adafruit_rockblock.RockBlock(uart)
-        rb.switch = digitalio.DigitalInOut(board.A1)
-        rb.switch.direction = digitalio.Direction.OUTPUT
-        rb.switch.value = False
-    else:
-        rb = []
-
-    return npx, i2c, rtc, imu, mgn, gps, bmp, mic, micv, hmd, gps_i, rb
-
-
-def ini_log(T1, imu, rtc, npx):
-    LED(0.5, npx, [0, 0, npx.v], [0, npx.v, 0], 5)
     time_now = "{:04d}{:02d}{:02d}_{:02d}{:02d}{:02d}".format(
         rtc.datetime.tm_year,
         rtc.datetime.tm_mon,
@@ -191,18 +160,41 @@ def ini_log(T1, imu, rtc, npx):
     except OSError:
         pass
     Fil_Log = "/sd/" + time_now[0:8] + "/Log_" + time_now + ".txt"
-    # Sleep IMU and wait by the time of its logging
-    imu._write_register(const(0x3E), const(0x02))
-    while not (rtc.datetime.tm_min % max(int(T1 / 60), 1) == 0):
-        LED(1, npx, [0, 0, 0], [0, 0, npx.v], 1)
-    imu._write_register(const(0x3E), const(0x00))
     npx[0] = (0, npx.v, 0)
     return time_now, ts, Fil_Log
 
+def log_sen(i2c):
+    import adafruit_bmp280
+    bmp = adafruit_bmp280.Adafruit_BMP280_I2C(i2c)
+    import audiobusio
+    mic = audiobusio.PDMIn(
+        board.MICROPHONE_CLOCK,
+        board.MICROPHONE_DATA,
+        sample_rate=16000,
+        bit_depth=16,
+    )
+    micv = array.array("H", [0] * 160)
+    mic.record(micv, len(micv))
+    import adafruit_sht31d
+    hmd = adafruit_sht31d.SHT31D(i2c)
 
-def log_gps(gps, rtc, npx):
-    gps.gps_switch.value = True
+    from math import sqrt as sqrt
+    temp = bmp.temperature
+    pres = bmp.pressure
+    hmd = hmd.relative_humidity
+    minb = int(sum(micv) / len(micv))
+    Slev = sum(float(x - minb) * (x - minb) for x in micv)
+    Slev = int(sqrt(Slev / len(micv)))
+    return temp, pres, hmd, Slev
+
+def log_gps(i2c, rtc, npx):
+    import adafruit_gps
+    gps = adafruit_gps.GPS_GtopI2C(i2c, debug=False)
+    gps.gps_switch = digitalio.DigitalInOut(board.A2)
+    gps.gps_switch.direction = digitalio.Direction.OUTPUT
+
     pass_i = 0
+    gps.gps_switch.value = True
     while pass_i == 0:
         LED(1.0, npx, [0, npx.v, 0], [npx.v / 3, npx.v / 3, npx.v / 3], 1)
         try:
@@ -242,11 +234,26 @@ def log_gps(gps, rtc, npx):
     gps_time = (year, mont, day_, hour, mins, secs, 0, -1, -1)
     rtc.datetime = time.struct_time(gps_time)
     gps.send_command(b"PMTK225,4")
+    time.sleep(1)
     gps.gps_switch.value = False
+    # gps.send_command(b"PMTK161,0*28")
     return nmea1, nmea2, lat, lon
 
 
-def log_imu(time_now, T2, Hz1, Hz2, imu, mgn, npx):
+def log_imu(time_now, T2, Hz1, Hz2, i2c, npx):
+    import adafruit_bno055_ext as adafruit_bno055
+    imu = adafruit_bno055.BNO055_I2C(i2c)
+    imu.mode = adafruit_bno055.CONFIG_MODE
+    time.sleep(0.01)
+    imu._write_register(const(0x3E), const(0x00))
+    time.sleep(0.01)
+    cald2 = bytearray(b'\xef\xff\x1f\x00\xdf\xffC\xfd}\xff\xc0\xfd') + \
+        bytearray(b'\xff\xff\xff\xff\x01\x00\xe8\x03\xea\x01')
+    imu.set_calibration(cald2)
+    time.sleep(0.01)
+    imu.mode = adafruit_bno055.NDOF_MODE
+    # imu.mode = adafruit_bno055.NDOF_FMC_OFF_MODE
+    # print(imu.offsets_magnetometer, imu.radius_magnetometer)
     npx[0] = [0, 0, npx.v]
     Dir_Out = time_now[0:8]
     Fil_low = "/sd/{0}/IMU_BNO055_{1}.txt".format(Dir_Out, time_now)
@@ -274,20 +281,23 @@ def log_imu(time_now, T2, Hz1, Hz2, imu, mgn, npx):
                     acc = [sum(acc[j::3]) / i for j in range(3)]
                     eul = imu.euler  # [sum(gyr[j::3])/i for j in range(3)]
                     cal = imu.calibration_status
-                    try:
-                        out_f.write("%10.5f\t" % t_n)
-                        out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(acc))
-                        out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(eul))
-                        out_f.write("%2d\t" % i)
-                        out_f.write("%1d\t%1d\t%1d\t%1d\r\n" % tuple(cal))
-                        out_f.flush()
-                    except OSError:
-                        pass
-                    # print(t_n,i)
+                    out_f.write("%10.5f\t" % t_n)
+                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(acc))
+                    out_f.write("%8.4f\t%8.4f\t%8.4f\t" % tuple(eul))
+                    out_f.write("%2d\t" % i)
+                    out_f.write("%1d\t%1d\t%1d\t%1d\r\n" % tuple(cal))
                     i, acc, eul, cal = 0, [], [], []
-        Nl = int(i_l / Hz1 * Hz2)
-    return Fil_low, Nl
-
+        out_f.flush()
+    Nl = int(i_l / Hz1 * Hz2)
+    imu_cal = imu.offsets_accelerometer
+    imu_cal += imu.offsets_gyroscope
+    imu_cal += imu.offsets_magnetometer
+    imu_cal += tuple([imu.radius_accelerometer, imu.radius_magnetometer])
+    print(imu_cal)
+    imu.mode = adafruit_bno055.CONFIG_MODE
+    imu._write_register(const(0x3E), const(0x02))
+    time.sleep(1)
+    return Fil_low, Nl, imu_cal
 
 def cal_spc(F_IMU, Nl, Nw, frq):
     d2r = 3.1415 / 180.0
@@ -297,7 +307,7 @@ def cal_spc(F_IMU, Nl, Nw, frq):
     Pxx, Pyy, Pzz = zeros(Nw), zeros(Nw), zeros(Nw)
     Qxz, Qyz, Cxy = zeros(Nw), zeros(Nw), zeros(Nw)
     with open(F_IMU, "r") as file:
-        Nseg = vector.floor((Nl - 1) / Nw)
+        Nseg = floor((Nl - 1) / Nw)
         next(file)
         for seg in range(Nseg):
             for i in range(Nw):
@@ -383,12 +393,22 @@ def cal_blk(Ncut, frq, Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
     b1 = Qyz / (((Pxx + Pyy) * Pzz) ** 0.5)
     # a2 = (Pxx - Pyy) / (Pxx + Pyy)
     # b2 = (2 * Cxy) / (Pxx + Pyy)
-    Mwd = vector.atan(b1 / a1)
+    Mwd = atan(b1 / a1)
     Mds = (2 * (1 - (a1 ** 2 + b1 ** 2) ** 0.5)) ** 0.5
     return Hs, Hsx, Hsy, Fp, Fpx, Fpy, Mwd, Mds
 
 
-def iri(rb, Hs, Fp, Pzz, lat, lon, npx, Fil_Log) :
+def iri(Hs, Fp, Pzz, lat, lon, npx, Fil_Log) :
+    # Setup Lockblock iridium if used
+    import adafruit_rockblock
+
+    uart = board.UART()
+    uart.baudrate = 19200
+    rb = adafruit_rockblock.RockBlock(uart)
+    rb.switch = digitalio.DigitalInOut(board.A1)
+    rb.switch.direction = digitalio.Direction.OUTPUT
+    rb.switch.value = False
+    time.sleep(10)
     rb.switch.value = True
     npx[0] = [npx.v, 0, 0]
     Nr = 1
@@ -411,17 +431,3 @@ def iri(rb, Hs, Fp, Pzz, lat, lon, npx, Fil_Log) :
         npx = LED(1, npx, [npx.v, 0, 0], [npx.v/3, npx.v/3, npx.v/3], 10)
     rb.switch.value = False
     return rb_sent, Nr
-
-## Added by T.Ka (2021/11/06)
-
-def ini_wdt(timeout) :
-    import microcontroller
-    import watchdog
-
-    wdt = microcontroller.watchdog
-    wdt.timeout = timeout
-    wdt.mode = watchdog.WatchDogMode.RESET
-    wdt.feed()
-    return wdt
-
-##
