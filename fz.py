@@ -34,7 +34,6 @@ import time
 import board
 import busio
 import os
-import neopixel
 import array
 from ulab import numpy as num
 from ulab.numpy import zeros, linspace, fft, sin, cos, floor, atan
@@ -50,7 +49,7 @@ def prt(Fil_Log, Str):
         flog.write(Str)
         flog.flush()
     # Uncomment the following line for debugging
-    # print(Str)
+    print(Str)
     return
 
 def LED(dt, npx, col1, col2, Nb):
@@ -59,7 +58,7 @@ def LED(dt, npx, col1, col2, Nb):
         time.sleep(dt / 2)
         npx[0] = col2
         time.sleep(dt / 2)
-    return npx
+    return
 
 def prm():
     with open("param.txt", "r") as fp:
@@ -91,17 +90,20 @@ def prm():
     frq = linspace(1e-10, 2 * 3.14 * Hz2 * (Nw - 1) / Nw, Nw)
     return T1, T2, Hz1, Hz2, Nw, Nc, frq, imu_i, cal_i, gps_i, sen_i, psd_i, iri_i
 
-def ini_sp_(cal_i, set_rtc, set_time):
-    # Setup NeoPixel--->Blink fast to show the system is initializing
-    npx = neopixel.NeoPixel(board.NEOPIXEL, 1)
-    npx.v = 3
-    npx = LED(0.2, npx, [0, 0, npx.v], [0, npx.v, 0], 10)
+def ini_sp_(npx, iri_i, cal_i):
     # Setup I2C
     i2c = busio.I2C(board.SCL, board.SDA)
     # Setup RTC
     rtc = adafruit_pcf8523.PCF8523(i2c)
-    if set_rtc:
-        rtc.datetime = time.struct_time(set_time)
+    # Setup Lockblock iridium if used
+    if iri_i >= 1 :
+        import adafruit_rockblock
+        uart = board.UART()
+        uart.baudrate = 19200
+        rb = adafruit_rockblock.RockBlock(uart)
+        rb.switch = digitalio.DigitalInOut(board.D5)
+        rb.switch.direction = digitalio.Direction.OUTPUT
+        time.sleep(2)
 
     # IMU Calibration (if cal_i == 1 )
     import adafruit_bno055_ext as adafruit_bno055
@@ -131,7 +133,11 @@ def ini_sp_(cal_i, set_rtc, set_time):
     time.sleep(0.5)
     imu._write_register(const(0x3E), const(0x02))
 
-    return npx, i2c, rtc
+    # GPS
+    # if gps_i == 1:
+    #    nmea1, nmea2, lat, lon = log_gps(i2c, rtc, npx)
+
+    return i2c, rtc, rb
 
 def ini_log(T1, rtc, npx):
     LED(0.5, npx, [0, 0, npx.v], [0, npx.v, 0], 5)
@@ -269,7 +275,6 @@ def log_imu(time_now, T2, Hz1, Hz2, i2c, npx):
             "bn5_N_i\t"
             "bn5_ca1\tbn5_ca2\tbn5_ca3\tbn5_ca4\r\n"
         )
-        out_f.flush()
         i, acc, eul, cal = 0, [], [], []
         while t_n < T2 + 1 / Hz1:
             t_n = time.monotonic() - t_s
@@ -287,7 +292,10 @@ def log_imu(time_now, T2, Hz1, Hz2, i2c, npx):
                     out_f.write("%2d\t" % i)
                     out_f.write("%1d\t%1d\t%1d\t%1d\r\n" % tuple(cal))
                     i, acc, eul, cal = 0, [], [], []
-        out_f.flush()
+        try:
+            out_f.flush()
+        except OSError:
+            pass
     Nl = int(i_l / Hz1 * Hz2)
     imu_cal = imu.offsets_accelerometer
     imu_cal += imu.offsets_gyroscope
@@ -398,36 +406,29 @@ def cal_blk(Ncut, frq, Pxx, Pyy, Pzz, Qxz, Qyz, Cxy):
     return Hs, Hsx, Hsy, Fp, Fpx, Fpy, Mwd, Mds
 
 
-def iri(Hs, Fp, Pzz, lat, lon, npx, Fil_Log) :
-    # Setup Lockblock iridium if used
-    import adafruit_rockblock
-
-    uart = board.UART()
-    uart.baudrate = 19200
-    rb = adafruit_rockblock.RockBlock(uart)
-    rb.switch = digitalio.DigitalInOut(board.A1)
-    rb.switch.direction = digitalio.Direction.OUTPUT
+def iri(iri_i, rb, Hs, Fp, Pzz, lat, lon, temp, pres, hmd, Slev, npx, Fil_Log) :
     rb.switch.value = False
-    time.sleep(10)
+    time.sleep(1)
     rb.switch.value = True
-    npx[0] = [npx.v, 0, 0]
-    Nr = 1
-    time.sleep(10)
+    time.sleep(5)
 
     rb_sent = struct.pack("f", Hs)
     rb_sent += struct.pack("f", Fp)
-    for j in range(len(Pzz)/4) :
-        rb_sent += struct.pack("f", Pzz[j])
+    if(iri_i == 2) :
+        for j in range(len(Pzz)/32) :
+            rb_sent += struct.pack("f", Pzz[j])
     rb_sent += struct.pack("f", lat)
     rb_sent += struct.pack("f", lon)
+    rb_sent += struct.pack("f", temp)
+    rb_sent += struct.pack("f", pres)
+    rb_sent += struct.pack("f", hmd)
+    rb_sent += struct.pack("f", Slev)
     rb.data_out = rb_sent
     status = rb.satellite_transfer()
 
-    time.sleep(10)
+    Nr = 1
     while status[0] > 8:
+        LED(.25, npx, [0, 0, 0], [0, npx.v, npx.v], 10)
         Nr += 1
-        rb.data_out = rb_sent   # Necessary ???
         status = rb.satellite_transfer()
-        npx = LED(1, npx, [npx.v, 0, 0], [npx.v/3, npx.v/3, npx.v/3], 10)
-    rb.switch.value = False
-    return rb_sent, Nr
+    return Nr
