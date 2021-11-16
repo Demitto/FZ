@@ -104,6 +104,8 @@ def ini_sp_(npx, iri_i, cal_i):
         rb.switch = digitalio.DigitalInOut(board.D5)
         rb.switch.direction = digitalio.Direction.OUTPUT
         time.sleep(2)
+    else :
+        rb = -1
 
     # IMU Calibration (if cal_i == 1 )
     import adafruit_bno055_ext as adafruit_bno055
